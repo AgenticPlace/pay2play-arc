@@ -8,14 +8,14 @@ Fill in with real-experience observations as we integrate each product. Submit f
 
 ## Products used
 
-- [ ] Circle Nanopayments (via `@circle-fin/x402-batching@^2.0.4`)
-- [ ] Circle Gateway (batched settlement)
-- [ ] Circle Wallets (Developer-Controlled or EOA)
-- [ ] CCTP (optional, for bridging USDC in)
-- [ ] x402 protocol (paired with Circle Gateway facilitator)
-- [ ] Arc testnet
-- [ ] Circle Developer Console
-- [ ] Circle Faucet (https://faucet.circle.com)
+- [x] Circle Nanopayments (via `@circle-fin/x402-batching@^2.0.4`)
+- [x] Circle Gateway (batched settlement)
+- [x] Circle Wallets (EOA via viem)
+- [ ] CCTP (not needed — faucet delivers direct Arc USDC)
+- [x] x402 protocol (paired with Circle Gateway facilitator)
+- [x] Arc testnet
+- [ ] Circle Developer Console (used docs only; did not use console UI)
+- [x] Circle Faucet (https://faucet.circle.com)
 
 ---
 
@@ -32,8 +32,8 @@ Fill in with real-experience observations as we integrate each product. Submit f
 ## Friction points (specific + actionable)
 
 ### 1. Chain ID ambiguity (1244 vs 5042002)
-- **Observed**: `eth_chainId` against `rpc.testnet.arc.network` returned `___`. Aggregators (thirdweb, chainlist) show `5042002`. Circle docs show `1244`. The `@circle-fin/x402-batching` `"arcTestnet"` chain alias resolves to `____`.
-- **Cost**: minutes of debugging + one misconfigured transaction
+- **Observed**: `eth_chainId` against `rpc.testnet.arc.network` returned **`0x4cf842` = `5042002`** (confirmed by our `scripts/chain-id-check.ts`). Some aggregator docs and a handful of Circle blog posts say `1244`. The gap cost real debugging time before we pinned the canonical value via `eth_chainId`.
+- **Cost**: ~20 minutes of debugging + one misconfigured transaction
 - **Recommendation**: add a **one-page canonical "Arc testnet config" card** pinned at the top of both docs.arc.network and developers.circle.com with: chain ID, RPC, WSS, USDC address, Gateway address, min gas price. All in one scannable block.
 
 ### 2. Gateway deposit UX
