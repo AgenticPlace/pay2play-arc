@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>pay2play · agnostic nanopayment infrastructure for Arc</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { font-family: -apple-system, Segoe UI, Helvetica, sans-serif; margin: 0; background: #0b1120; color: #e2e8f0; }
+a { color: #a78bfa; text-decoration: none; }
+a:hover { text-decoration: underline; }
+header { padding: 3rem 2rem 2rem; text-align: center; }
+header h1 { font-size: 2.6rem; margin: 0; letter-spacing: -0.02em; }
+header h1 .brand { background: linear-gradient(90deg, #22d3ee, #a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+header .tag { color: #94a3b8; margin-top: 0.6rem; font-size: 1.15rem; }
+header .sub { color: #64748b; margin-top: 0.3rem; font-size: 0.95rem; max-width: 50rem; margin-left: auto; margin-right: auto; }
+.container { max-width: 64rem; margin: 0 auto; padding: 0 1.5rem 4rem; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
+@media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+.panel { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 1.2rem 1.4rem; }
+.panel h2 { margin: 0 0 0.7rem; font-size: 1.1rem; color: #22d3ee; }
+.panel.table { padding: 0; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
+th, td { text-align: left; padding: 0.5rem 0.9rem; border-bottom: 1px solid #1f2937; }
+th { background: #0f172a; color: #94a3b8; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.07em; }
+.ok { color: #22c55e; font-weight: 600; }
+.bad { color: #ef4444; font-weight: 600; }
+.meh { color: #f59e0b; }
+.components { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-top: 1rem; }
+@media (max-width: 720px) { .components { grid-template-columns: 1fr; } }
+.card { background: #0f172a; border: 1px solid #1f2937; border-radius: 10px; padding: 1rem 1.15rem; }
+.card .id { font-family: ui-monospace, monospace; font-size: 0.78rem; color: #22d3ee; }
+.card h3 { margin: 0.15rem 0 0.3rem; font-size: 1rem; }
+.card .desc { color: #94a3b8; font-size: 0.86rem; line-height: 1.45; }
+.card .meta { margin-top: 0.6rem; font-size: 0.75rem; color: #64748b; }
+.pill { display: inline-block; padding: 0.1rem 0.5rem; background: #1f2937; border-radius: 4px; color: #94a3b8; font-size: 0.72rem; margin-right: 0.25rem; }
+.pill.live { background: #064e3b; color: #34d399; }
+.pill.wow { background: #4c1d95; color: #c4b5fd; }
+.pill.cut { background: #7f1d1d; color: #fca5a5; }
+.cta { text-align: center; margin-top: 2rem; }
+.cta a { display: inline-block; margin: 0 0.3rem; padding: 0.6rem 1.2rem; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 0.9rem; }
+.cta a.primary { background: #6366f1; border-color: #6366f1; color: white; }
+footer { text-align: center; color: #475569; padding: 2rem 1rem; font-size: 0.82rem; border-top: 1px solid #1f2937; }
+code { background: #1f2937; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.85rem; }
+pre { background: #0f172a; padding: 0.9rem 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.84rem; line-height: 1.5; border: 1px solid #1f2937; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="brand">pay2play</span></h1>
+  <div class="tag">Meter anything on Arc. HTTP, MCP, stream, or pixel — settled gaslessly in USDC.</div>
+  <div class="sub">A submission for the <a href="https://lablab.ai/ai-hackathons/nano-payments-arc">Agentic Economy on Arc</a> hackathon (Apr 2026). An agnostic nanopayment SDK built on Circle's stablecoin-native L1 with batched x402 settlement.</div>
+  <div class="cta">
+    <a class="primary" href="http://localhost:4023/">🌟 Live streaming demo (C3)</a>
+    <a href="https://github.com/pay2play/pay2play">GitHub</a>
+    <a href="https://testnet.arcscan.app">Arcscan</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="row">
+    <section class="panel">
+      <h2>Coverage matrix</h2>
+      <table>
+        <tr><th>Dimension</th><th>Modes</th></tr>
+        <tr><td>Transport</td><td>HTTP · MCP · SSE · viewport</td></tr>
+        <tr><td>Metering</td><td>request · tokens · frames · bytes · rows · dwell · seconds</td></tr>
+        <tr><td>Settlement</td><td>Circle Gateway batched (default)</td></tr>
+        <tr><td>Actor</td><td>human↔agent · agent↔agent · M2M</td></tr>
+      </table>
+    </section>
+
+    <section class="panel table">
+      <table>
+        <tr><th colspan="3">Why Arc (margin on $0.001 call)</th></tr>
+        <tr><td>Ethereum L1</td><td class="bad">–49,900%</td><td>gas ~$0.50</td></tr>
+        <tr><td>Optimism</td><td class="bad">–200 to –400%</td><td>gas ~$0.003–$0.005</td></tr>
+        <tr><td>Base L2</td><td class="meh">–400% to +70%</td><td>marginal</td></tr>
+        <tr><td>Arc direct</td><td class="bad">–200%</td><td>20 Gwei × 21k gas</td></tr>
+        <tr><td><b>Arc + Gateway</b></td><td class="ok">+97%</td><td><b>batched ~$0.00003/action</b></td></tr>
+      </table>
+    </section>
+  </div>
+
+  <h2 style="margin-top:2rem;color:#22d3ee;font-size:1.15rem;">Components</h2>
+  <div class="components">
+    <div class="card"><div class="id">C1</div><h3>api-meter <span class="pill live">live 402</span></h3>
+      <div class="desc">HTTP endpoints paywalled at $0.001/req. Track 1: Per-API Monetization.</div>
+      <div class="meta"><span class="pill">$0.001/req</span><span class="pill">:4021</span></div></div>
+    <div class="card"><div class="id">C2</div><h3>agent-loop <span class="pill live">live 402</span></h3>
+      <div class="desc">Two Node processes, separate wallets; Agent A pays Agent B $0.0005/question. Track 2.</div>
+      <div class="meta"><span class="pill">$0.0005/ask</span><span class="pill">:4022</span></div></div>
+    <div class="card"><div class="id">C3</div><h3>llm-stream <span class="pill wow">WOW</span><span class="pill live">SSE live</span></h3>
+      <div class="desc">Streaming per-token paywall. Dual counters: vouchers signed (client) vs on-chain batches (server+chain). Track 3.</div>
+      <div class="meta"><span class="pill">$0.00005/token</span><span class="pill">:4023</span><a href="http://localhost:4023/"> open →</a></div></div>
+    <div class="card"><div class="id">C4</div><h3>dwell-reader <span class="pill cut">cut</span></h3>
+      <div class="desc">Per-paragraph viewport-dwell paywall. Primitive ships in <code>@pay2play/client/viewport</code>; app cut for time.</div>
+      <div class="meta"><span class="pill">$0.0001/paragraph</span></div></div>
+    <div class="card"><div class="id">C5</div><h3>mcp-tool <span class="pill">scaffolded</span></h3>
+      <div class="desc">MCP server with paid <code>web.search</code> / <code>arcscan.lookup</code>. Runs over streamable-HTTP so x402 headers flow.</div>
+      <div class="meta"><span class="pill">$0.001/call</span><span class="pill">:4025</span></div></div>
+    <div class="card"><div class="id">C6</div><h3>frame-classifier <span class="pill live">live 402</span></h3>
+      <div class="desc">Machine-to-machine: "camera" posts frames; classifier charges $0.0005/frame. Dynamic pricing from request body.</div>
+      <div class="meta"><span class="pill">$0.0005/frame</span><span class="pill">:4026</span></div></div>
+    <div class="card"><div class="id">C7</div><h3>row-meter <span class="pill live">live 402</span></h3>
+      <div class="desc">Pay-per-select data marketplace. <code>/data?limit=N</code> → 402 with amount = N × $0.0001.</div>
+      <div class="meta"><span class="pill">$0.0001/row</span><span class="pill">:4027</span></div></div>
+  </div>
+
+  <section class="panel" style="margin-top:2rem;">
+    <h2>Honest framing</h2>
+    <p style="color:#94a3b8;font-size:0.92rem;line-height:1.6;">
+      pay2play is a <b>thin composition</b> over Circle's <code>@circle-fin/x402-batching</code> and <code>@x402/mcp</code> from the x402 monorepo. We do not reimplement settlement, the x402 spec, or batching.
+    </p>
+    <p style="color:#94a3b8;font-size:0.92rem;line-height:1.6;">
+      What we add: a unified <code>UsageSignal</code> meter that normalizes every metering axis into one price function, a voucher <code>Session</code> for streaming flows (client accumulates, server flushes), and per-angle modular components that demonstrate the abstraction across all four hackathon tracks. Every prior winner rebuilt the same payment plumbing for one vertical; pay2play is the plumbing.
+    </p>
+  </section>
+
+  <section class="panel" style="margin-top:1.2rem;">
+    <h2>Quick start</h2>
+<pre>git clone https://github.com/pay2play/pay2play.git
+cd pay2play
+pnpm install
+cp .env.example .env            # fill SELLER_ADDRESS, BUYER_PRIVATE_KEY
+pnpm generate-wallets           # or reuse existing
+# Visit https://faucet.circle.com/  to fund buyer with testnet USDC
+pnpm --filter c3-llm-stream start    # →  http://localhost:4023/</pre>
+  </section>
+
+</main>
+
+<footer>
+  <div>Testnet-only. Arc mainnet not yet live as of April 2026.</div>
+  <div style="margin-top:0.3rem;">Built on Circle Nanopayments · Arc Testnet · x402 v2 · MIT</div>
+</footer>
+
+</body>
+</html>
