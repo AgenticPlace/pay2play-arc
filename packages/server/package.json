@@ -29,6 +29,10 @@
     "./agenticplace": {
       "types": "./dist/agenticplace.d.ts",
       "import": "./dist/agenticplace.js"
+    },
+    "./fee-admin": {
+      "types": "./dist/fee-admin.d.ts",
+      "import": "./dist/fee-admin.js"
     }
   },
   "scripts": {

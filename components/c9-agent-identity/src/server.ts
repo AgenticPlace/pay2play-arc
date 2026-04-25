@@ -12,7 +12,14 @@
 
 import express from "express";
 import { createPublicClient, http } from "viem";
-import { meter, ARC_TESTNET, IDENTITY_REGISTRY_ABI, JOB_ESCROW_ABI } from "@pay2play/core";
+import {
+  meter,
+  ARC_TESTNET,
+  IDENTITY_REGISTRY_ABI,
+  JOB_ESCROW_ABI,
+  feeConfig,
+  USDC_DECIMALS,
+} from "@pay2play/core";
 import { defaultFacilitator } from "@pay2play/server/http";
 import { corsForX402 } from "@pay2play/server/middleware";
 import {
@@ -20,6 +27,7 @@ import {
   runHealthChecks,
   type ContractHealthCheck,
 } from "@pay2play/server/agenticplace";
+import { createFeeAdminRouter } from "@pay2play/server/fee-admin";
 import { registerAgent } from "./register.js";
 import { runJobLifecycle, getJobInfo } from "./job.js";
 
@@ -29,7 +37,23 @@ if (!process.env.SELLER_ADDRESS) {
   console.warn("[c9] SELLER_ADDRESS not set — using gatewayWallet fallback for PAY_TO");
 }
 
-const m = meter({ request: "$0.002" });
+// Fee config sourced from env, with the same default as before.
+const ARC_BASE_PRICE_USD = process.env.PAY2PLAY_BASE_PRICE_USD ?? "0.002";
+const ARC_FEE_BPS = process.env.PAY2PLAY_FEE_BPS
+  ? Number(process.env.PAY2PLAY_FEE_BPS)
+  : undefined;
+const ARC_GAS_OVERHEAD_USD = process.env.PAY2PLAY_GAS_OVERHEAD_USD;
+const arcFeeConfig = feeConfig({
+  basePrice: ARC_BASE_PRICE_USD,
+  decimals: USDC_DECIMALS,
+  facilitatorFeeBps: ARC_FEE_BPS,
+  gasOverhead: ARC_GAS_OVERHEAD_USD,
+  symbol: "USDC",
+  network: ARC_TESTNET.caip2,
+  schemeName: "GatewayWalletBatched",
+});
+
+const m = meter({ request: "$" + ARC_BASE_PRICE_USD });
 const app = express();
 app.use(corsForX402());
 app.use(express.json());
@@ -94,13 +118,21 @@ app.get("/", (_req, res) => {
       validationRegistry: ARC_TESTNET.contracts.validationRegistry,
       jobEscrow:          ARC_TESTNET.contracts.jobEscrow,
     },
-    pricing: { perOperation: "$0.002 USDC" },
+    pricing: {
+      perOperation: "$" + arcFeeConfig.basePriceAtomic + " atomic USDC",
+      perOperationDisplay: "$" + ARC_BASE_PRICE_USD + " USDC",
+      decimals: arcFeeConfig.decimals,
+      facilitatorFeeBps: arcFeeConfig.facilitatorFeeBps ?? 0,
+      gasOverheadAtomic: (arcFeeConfig.gasOverheadAtomic ?? 0n).toString(),
+    },
     endpoints: [
       "GET  /info               — service metadata (free)",
       "GET  /health             — contract reachability (free)",
-      "POST /agent/register     — ERC-8004 mint + reputation seed ($0.002)",
-      "POST /job/create         — ERC-8183 full lifecycle ($0.002)",
+      "POST /agent/register     — ERC-8004 mint + reputation seed (paid)",
+      "POST /job/create         — ERC-8183 full lifecycle (paid)",
       "GET  /job/:id            — read job state (free)",
+      "GET  /admin/fees         — current fee config (admin-only)",
+      "POST /admin/fees         — update fee config (admin-only)",
     ],
   });
 });
@@ -135,6 +167,20 @@ async function startServer() {
   });
 
   app.use(router);
+
+  // Optional fee admin router — enabled only if PAY2PLAY_ADMIN_KEY is set.
+  const adminKey = process.env.PAY2PLAY_ADMIN_KEY?.trim();
+  if (adminKey) {
+    const adminRouter = createFeeAdminRouter({
+      secret: adminKey,
+      initialConfig: arcFeeConfig,
+      configPath: process.env.PAY2PLAY_FEE_CONFIG_PATH ?? undefined,
+    });
+    app.use(adminRouter);
+    console.log("[c9] fee admin enabled at /admin/fees (X-Admin-Key required)");
+  } else {
+    console.log("[c9] fee admin disabled — set PAY2PLAY_ADMIN_KEY to enable");
+  }
 
   // Run health check at startup — log loudly if any contract is missing
   const startupHealth = await runHealthChecks(contractChecks);
