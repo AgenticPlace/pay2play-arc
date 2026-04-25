@@ -37,3 +37,9 @@ pnpm-debug.log*
 
 # Build outputs
 *.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
