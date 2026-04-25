@@ -141,3 +141,43 @@ The Algorand version of pay2play lives in its own standalone repository:
 ## Cut order (when phase checkpoints miss)
 
 | All four tracks | **COMPLETE** — C1/C2/C3/C4 all live + tested |
+
+---
+
+## Governance-layer Vyper primitives (`contracts/arc/`)
+
+The HTTP components (C1–C9) settle via Circle Gateway batched USDC at L1.
+For on-chain governance / treasury / split logic, pay2play-arc ships six
+Vyper contracts. Four are pay2play-grown; two are vendored verbatim from
+[vyperlang/vyper-agentic-payments](https://github.com/vyperlang/vyper-agentic-payments)
+(MIT, with provenance pinned via header comments and verified by
+`scripts/check-contract-drift.sh`).
+
+| Contract | Source | Purpose | When to use |
+|---|---|---|---|
+| `PaymentChannel.vy` | pay2play | EIP-712 off-chain channel; sender locks USDC, recipient closes with signed voucher | Long-lived two-party streams where you want the chain only at boundaries |
+| `AgentEscrow.vy` | pay2play (also at `0x0747EEf0...` on Arc testnet as ERC-8183 JobEscrow) | OPEN → FUNDED → SUBMITTED → COMPLETED job lifecycle | AgenticPlace job postings; agent gigs that need on-chain dispute |
+| `SpendingLimiter.vy` | pay2play | Per-agent per-tx / daily / lifetime caps + recipient allowlist | mindX agent autonomous-loop spend guard |
+| `SubscriptionManager.vy` | pay2play | Recurring USDC plans with auto-renew, pro-rata refund, metered billing | Subscription products built on pay2play |
+| **`PaymentSplitter.vy`** | **vendored** ([upstream](https://github.com/vyperlang/vyper-agentic-payments/blob/main/contracts/PaymentSplitter.vy)) | Multi-recipient revenue distribution by basis-point shares (≤100 recipients per pool) | AgenticPlace marketplace splits — provider / platform / mindX treasury |
+| **`Vault.vy`** | **vendored** ([upstream](https://github.com/vyperlang/vyper-agentic-payments/blob/main/contracts/Vault.vy)) | Per-depositor USDC balances; only the depositor can withdraw | Per-mindX-agent treasury; accumulate earnings until sweep |
+
+**Drift policy:** vendored files carry a `CONTRACT_SOURCE` header pinning a
+specific upstream commit. CI runs `scripts/check-contract-drift.sh` to
+catch local edits (every change must come through a re-vendor with a new
+pin, never a hand-edit). To re-pin against a newer upstream commit:
+
+```bash
+bash scripts/check-contract-drift.sh --pin <new-commit-sha>  # confirms drift
+# manually re-fetch + stamp the header (or write a re-pin helper if needed)
+```
+
+**Python integration:** `python/pay2play_arc/contracts.py` ContractLoader
+exposes `payment_splitter(usdc)` and `vault(usdc)` alongside the existing
+helpers. Titanoboa fixtures + smoke tests live at `contracts/arc/tests/`
+(skip-guarded if `titanoboa` is not installed).
+
+**Out of scope here:** wiring PaymentSplitter into the live AgenticPlace
+settlement flow (that's a product decision about platform fees and
+treasury cuts — separate work). Vault as the actual mindX agent custody
+backend (also separate — agent custody is a bigger design question).

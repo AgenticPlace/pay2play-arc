@@ -101,6 +101,22 @@ class ContractLoader:
         """Load SubscriptionManager.vy."""
         return self._load("SubscriptionManager", token)
 
+    def payment_splitter(self, token: str) -> Any:
+        """Load PaymentSplitter.vy — multi-recipient revenue distribution
+        by basis-point shares. Useful for AgenticPlace marketplace splits
+        (provider / platform / treasury). Vendored from
+        vyperlang/vyper-agentic-payments.
+        """
+        return self._load("PaymentSplitter", token)
+
+    def vault(self, token: str) -> Any:
+        """Load Vault.vy — minimal per-depositor USDC vault. Useful as a
+        per-agent treasury primitive (each mindX agent gets a vault entry
+        as it earns; only the depositor can withdraw). Vendored from
+        vyperlang/vyper-agentic-payments.
+        """
+        return self._load("Vault", token)
+
     def mock_erc20(self, initial_supply: int = 10**24) -> Any:
         """Deploy a minimal ERC-20 mock for testing. Requires snekmate."""
         try:
