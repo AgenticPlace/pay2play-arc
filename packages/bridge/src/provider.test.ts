@@ -170,16 +170,30 @@ describe("provider helpers", () => {
 describe("CctpBridgeProvider", () => {
   const provider = new CctpBridgeProvider();
 
-  it("declares all expected routes", () => {
+  it("declares all expected routes (post bridge-kit migration: 9 chains incl. Solana)", () => {
     expect(provider.id).toBe("cctp");
-    // 7 CCTP-active chains (Ethereum, Avalanche, OP, Arbitrum, Base, Polygon, Arc).
-    // Pairs = 7 * 6 = 42.
-    expect(provider.supportedRoutes.length).toBe(42);
-    // Sample a known-supported route
+    // 9 CCTP-active chains: Ethereum, Avalanche, OP, Arbitrum, Base, Polygon,
+    // Arc, Solana mainnet, Solana devnet. Pairs = 9 * 8 = 72.
+    expect(provider.supportedRoutes.length).toBe(72);
     const has = provider.supportedRoutes.some(
       (r) => r.from === "eip155:5042002" && r.to === "eip155:8453" && r.asset === "USDC",
     );
     expect(has).toBe(true);
+  });
+
+  it("supports Solana CAIP-2 routes both ways (free with bridge-kit migration)", () => {
+    const solToBase = provider.supportedRoutes.some(
+      (r) => r.from === "solana:mainnet" && r.to === "eip155:8453" && r.asset === "USDC",
+    );
+    expect(solToBase).toBe(true);
+    const ethToSol = provider.supportedRoutes.some(
+      (r) => r.from === "eip155:1" && r.to === "solana:mainnet" && r.asset === "USDC",
+    );
+    expect(ethToSol).toBe(true);
+    const arcToSolDev = provider.supportedRoutes.some(
+      (r) => r.from === "eip155:5042002" && r.to === "solana:devnet" && r.asset === "USDC",
+    );
+    expect(arcToSolDev).toBe(true);
   });
 
   it("estimate computes bigint-correct fee math", async () => {

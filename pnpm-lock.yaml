@@ -281,9 +281,9 @@ importers:
       '@circle-fin/adapter-viem-v2':
         specifier: latest
         version: 1.8.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(viem@2.48.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@3.25.67))
-      '@circle-fin/app-kit':
+      '@circle-fin/bridge-kit':
         specifier: latest
-        version: 1.4.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
+        version: 1.8.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@pay2play/core':
         specifier: workspace:*
         version: link:../core
@@ -378,10 +378,6 @@ packages:
     peerDependencies:
       viem: ^2.30.0
 
-  '@circle-fin/app-kit@1.4.1':
-    resolution: {integrity: sha512-Iu+8bkEhbQ10OI7dQk2JZjb7f/L2cJbxd4THYaYu7meR/9Mp4lJjIKCAjufID+ZWtSAHsbybyMd6kkt3KJCd0Q==}
-    engines: {node: '>=16.0.0'}
-
   '@circle-fin/bridge-kit@1.8.3':
     resolution: {integrity: sha512-RGQJ5rOQ+B5w3Vz/ijl1ePoXlzWa2128/Hfin6N5WRmbme0H5/O37vvNfd1xpmBzlQVpdMYNb4ZDSF8BFWxVTw==}
     engines: {node: '>=16.0.0'}
@@ -393,20 +389,6 @@ packages:
     peerDependenciesMeta:
       '@solana/web3.js':
         optional: true
-
-  '@circle-fin/provider-gateway-v1@1.0.1':
-    resolution: {integrity: sha512-KmVUinvfFLZ5Qrqzwd0cKyrA/KSp9Nydfaseh+WRKTED/88D8KJ7vMThOS11k+S+uFqMJCxxwXNg82pclFNIKA==}
-
-  '@circle-fin/provider-stablecoin-service-swap@1.1.0':
-    resolution: {integrity: sha512-Laatoy66+1m2aeXZvfktHcOnlpQPZqlpQJEgSg9+MaAWXCEQuWSbT1B0xroPwgHrsoIohLcgSeeCe1S28pTjEQ==}
-
-  '@circle-fin/swap-kit@1.1.0':
-    resolution: {integrity: sha512-7t39mfpJKyZ/v/No8jPxHTf41WGRNzsZGbqVKRRUH0d5erJgo9nP8N4TP0d8M1V9kShfDW07JMKdq6c6H6XcfQ==}
-    engines: {node: '>=16.0.0'}
-
-  '@circle-fin/unified-balance-kit@1.0.1':
-    resolution: {integrity: sha512-3kJFGk0LEedLO7tQ8vwqSPsp/eH/n2sYvc2MKxpqegXrJL1XlBKg2mIJNR8skMx+0BWNVCMIGdpxjkHdodaraQ==}
-    engines: {node: '>=16.0.0'}
 
   '@circle-fin/x402-batching@2.1.0':
     resolution: {integrity: sha512-FtumeFYROaucW491+3DcH5EfIJL5KKPJje5q1iiAEptmuJHMZ38bcib2W1ifmh7IVvO+ZUVCbMq9aqbIqgsiQw==}
@@ -2087,25 +2069,6 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@circle-fin/app-kit@1.4.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@circle-fin/bridge-kit': 1.8.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@circle-fin/provider-gateway-v1': 1.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@circle-fin/swap-kit': 1.1.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@circle-fin/unified-balance-kit': 1.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@ethersproject/address': 5.8.0
-      '@ethersproject/bytes': 5.8.0
-      '@ethersproject/units': 5.8.0
-      '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.67)
-      bs58: 6.0.0
-      zod: 3.25.67
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - typescript
-      - utf-8-validate
-
   '@circle-fin/bridge-kit@1.8.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)':
     dependencies:
       '@circle-fin/provider-cctp-v2': 1.6.3(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
@@ -2136,65 +2099,6 @@ snapshots:
       zod: 3.25.67
     optionalDependencies:
       '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - typescript
-      - utf-8-validate
-
-  '@circle-fin/provider-gateway-v1@1.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@ethersproject/address': 5.8.0
-      '@ethersproject/bytes': 5.8.0
-      '@ethersproject/units': 5.8.0
-      '@noble/curves': 1.4.2
-      '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.67)
-      bs58: 6.0.0
-      zod: 3.25.67
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - typescript
-      - utf-8-validate
-
-  '@circle-fin/provider-stablecoin-service-swap@1.1.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.67)
-      zod: 3.25.67
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - typescript
-      - utf-8-validate
-
-  '@circle-fin/swap-kit@1.1.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@circle-fin/provider-stablecoin-service-swap': 1.1.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@ethersproject/address': 5.8.0
-      '@ethersproject/bytes': 5.8.0
-      '@ethersproject/units': 5.8.0
-      '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.67)
-      bs58: 6.0.0
-      zod: 3.25.67
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - typescript
-      - utf-8-validate
-
-  '@circle-fin/unified-balance-kit@1.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@circle-fin/provider-gateway-v1': 1.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@ethersproject/address': 5.8.0
-      '@ethersproject/bytes': 5.8.0
-      '@ethersproject/units': 5.8.0
-      '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.67)
-      bs58: 6.0.0
-      zod: 3.25.67
     transitivePeerDependencies:
       - bufferutil
       - encoding

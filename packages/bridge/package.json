@@ -57,9 +57,12 @@
     "vitest": "^2.1.0"
   },
   "dependencies": {
-    "@circle-fin/app-kit": "latest",
+    "@circle-fin/bridge-kit": "latest",
     "@circle-fin/adapter-viem-v2": "latest",
     "@pay2play/core": "workspace:*",
     "viem": "^2.47.1"
+  },
+  "peerDependenciesMeta": {
+    "@circle-fin/adapter-solana-kit": { "optional": true }
   }
 }
