@@ -12,3 +12,9 @@ export type {
   SendResult,
   AppKitAdapter,
 } from "./types.js";
+
+// Modular bridge zoo — each provider is also independently importable
+// via the `@pay2play/bridge/<id>` subpath.
+export * from "./provider.js";
+export { BridgeRegistry, DEFAULT_PRIORITY } from "./registry.js";
+export { CctpBridgeProvider } from "./providers/cctp.js";
