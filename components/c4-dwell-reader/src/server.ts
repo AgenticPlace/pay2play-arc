@@ -17,6 +17,10 @@ import {
   ARC_TESTNET,
   Session,
   mkVoucherId,
+  parseDecimal,
+  formatDecimal,
+  multiplyByCount,
+  USDC_DECIMALS,
   type Voucher,
 } from "@pay2play/core";
 
@@ -24,13 +28,16 @@ const PORT = Number(process.env.C4_PORT ?? "4024");
 const SELLER_ADDRESS =
   process.env.SELLER_ADDRESS ?? "0x000000000000000000000000000000000000abcd";
 
-const PRICE_PER_PARAGRAPH = 0.0001;
+const PRICE_PER_PARAGRAPH_USD =
+  process.env.PAY2PLAY_PARAGRAPH_PRICE_USD ?? "0.0001";
+const PRICE_PER_PARAGRAPH_ATOMIC = parseDecimal(PRICE_PER_PARAGRAPH_USD, USDC_DECIMALS);
+const PRICE_PER_PARAGRAPH_DISPLAY = formatDecimal(PRICE_PER_PARAGRAPH_ATOMIC, USDC_DECIMALS);
 const VOUCHERS_PER_BATCH = 10;
 const MAX_FLUSH_MS = 8000;
 const DWELL_MS = 3000;
 
 const m = meter({
-  dwell: (s) => (s.ms >= DWELL_MS ? `$${PRICE_PER_PARAGRAPH.toFixed(4)}` : "$0"),
+  dwell: (s) => (s.ms >= DWELL_MS ? "$" + PRICE_PER_PARAGRAPH_DISPLAY : "$0"),
 });
 
 function fakeTxHash(): string {
@@ -74,7 +81,10 @@ const serverSession = new Session({
     stats.lastTxs = [tx, ...stats.lastTxs].slice(0, 8);
     stats.batchesSettled += 1;
     stats.vouchersFlushed += vs.length;
-    stats.totalUsdc = `$${(stats.paragraphsDwelled * PRICE_PER_PARAGRAPH).toFixed(4)}`;
+    stats.totalUsdc = "$" + formatDecimal(
+      multiplyByCount(PRICE_PER_PARAGRAPH_ATOMIC, stats.paragraphsDwelled),
+      USDC_DECIMALS,
+    );
     publishStats();
     console.log(`[c4] batch settled: ${vs.length} vouchers  tx=${tx.slice(0, 22)}…`);
     return 1;
@@ -128,7 +138,7 @@ app.post("/voucher", async (req: Request, res: Response) => {
         authorization: {
           from: "0x0000000000000000000000000000000000000000" as `0x${string}`,
           to: SELLER_ADDRESS as `0x${string}`,
-          value: Math.round(PRICE_PER_PARAGRAPH * 1e6).toString(),
+          value: PRICE_PER_PARAGRAPH_ATOMIC.toString(),
           validAfter: "0",
           validBefore: "9999999999",
           nonce: ("0x" + id.replace(/-/g, "").padEnd(64, "0")) as `0x${string}`,
@@ -150,7 +160,7 @@ app.get("/stats", (_req, res) => {
     ...stats,
     component: "c4-dwell-reader",
     network: ARC_TESTNET.name,
-    pricePerParagraph: `$${PRICE_PER_PARAGRAPH}`,
+    pricePerParagraph: "$" + PRICE_PER_PARAGRAPH_DISPLAY,
     dwellThresholdMs: DWELL_MS,
   });
 });
@@ -193,7 +203,7 @@ aside{position:sticky;top:1.5rem;align-self:start}
 <header>
   <div>
     <h1>pay2play · C4 · per-paragraph dwell <span class="pill">Arc Testnet</span></h1>
-    <div class="sub">Read slowly = pay $${PRICE_PER_PARAGRAPH.toFixed(4)} USDC per paragraph after ${DWELL_MS / 1000}s. Scroll past = free.</div>
+    <div class="sub">Read slowly = pay $${PRICE_PER_PARAGRAPH_DISPLAY} USDC per paragraph after ${DWELL_MS / 1000}s. Scroll past = free.</div>
   </div>
 </header>
 <div class="layout">
@@ -267,7 +277,7 @@ aside{position:sticky;top:1.5rem;align-self:start}
       <div style="font-size:.8rem;color:#94a3b8;font-weight:600;margin-bottom:.4rem">How it works</div>
       <div class="note">
         Each paragraph has an <b>IntersectionObserver</b>.<br>
-        Stay ≥ 50 % visible for <b>${DWELL_MS / 1000} seconds</b> → $${PRICE_PER_PARAGRAPH.toFixed(4)} voucher signed.<br>
+        Stay ≥ 50 % visible for <b>${DWELL_MS / 1000} seconds</b> → $${PRICE_PER_PARAGRAPH_DISPLAY} voucher signed.<br>
         Scroll past quickly → free.<br><br>
         Every <b>${VOUCHERS_PER_BATCH} vouchers</b> or <b>${MAX_FLUSH_MS / 1000} s</b> → server flushes a Gateway batch to Arc.<br><br>
         <b>Green border</b> = reading (timer running)<br>
@@ -279,7 +289,14 @@ aside{position:sticky;top:1.5rem;align-self:start}
 
 <script>
 const DWELL_MS = ${DWELL_MS};
-const PRICE = ${PRICE_PER_PARAGRAPH};
+const PRICE_ATOMIC = ${PRICE_PER_PARAGRAPH_ATOMIC.toString()}n;
+const USDC_DECIMALS = ${USDC_DECIMALS};
+function formatAtomic(atomic) {
+  const divisor = 10n ** BigInt(USDC_DECIMALS);
+  const whole = (atomic / divisor).toString();
+  const frac = (atomic % divisor).toString().padStart(USDC_DECIMALS, "0").replace(/0+$/, "");
+  return frac === "" ? whole : whole + "." + frac;
+}
 
 const parasEl = document.getElementById('paras');
 const signedEl = document.getElementById('signed');
@@ -291,7 +308,7 @@ function updateStats(s) {
   parasEl.textContent = s.paragraphsDwelled;
   signedEl.textContent = s.vouchersSigned;
   batchesEl.textContent = s.batchesSettled;
-  usdcEl.textContent = s.totalUsdc || '$' + (s.paragraphsDwelled * PRICE).toFixed(4);
+  usdcEl.textContent = s.totalUsdc || '$' + formatAtomic(BigInt(s.paragraphsDwelled) * PRICE_ATOMIC);
   if (s.lastTxs && s.lastTxs.length) {
     txsEl.innerHTML = s.lastTxs.map(tx =>
       '<div><a href="https://testnet.arcscan.app/tx/' + tx + '" target="_blank">' + tx.slice(0,24) + '…</a></div>'
@@ -357,5 +374,5 @@ document.querySelectorAll('article p').forEach(p => observer.observe(p));
 
 app.listen(PORT, () => {
   console.log(`[c4] on http://localhost:${PORT}`);
-  console.log(`[c4] open the page and read slowly — each paragraph dwelled = $${PRICE_PER_PARAGRAPH} voucher`);
+  console.log(`[c4] open the page and read slowly — each paragraph dwelled = $${PRICE_PER_PARAGRAPH_DISPLAY} voucher`);
 });

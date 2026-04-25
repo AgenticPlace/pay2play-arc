@@ -14,6 +14,10 @@ import {
   ARC_TESTNET,
   Session,
   mkVoucherId,
+  parseDecimal,
+  formatDecimal,
+  multiplyByCount,
+  USDC_DECIMALS,
   type Voucher,
   type UsageSignal,
 } from "@pay2play/core";
@@ -26,14 +30,22 @@ if (!SELLER_ADDRESS) {
 }
 const SELLER = SELLER_ADDRESS ?? "0x000000000000000000000000000000000000abcd";
 
-const PRICE_PER_TOKEN = 0.00005;
+// Bigint-correct: 50n atomic USDC = $0.00005. No float math anywhere downstream.
+const PRICE_PER_TOKEN_USD = process.env.PAY2PLAY_TOKEN_PRICE_USD ?? "0.00005";
+const PRICE_PER_TOKEN_ATOMIC = parseDecimal(PRICE_PER_TOKEN_USD, USDC_DECIMALS);
+const PRICE_PER_TOKEN_DISPLAY = formatDecimal(PRICE_PER_TOKEN_ATOMIC, USDC_DECIMALS); // canonical
 const TOKENS_PER_VOUCHER = 100;
 const VOUCHERS_PER_BATCH = 5;
 const MAX_FLUSH_MS = 5000;
 const MAX_SSE_SUBS = 50;
 
 const m = meter({
-  tokens: (s) => `$${(s.count * PRICE_PER_TOKEN).toFixed(6)}`,
+  // Multiply atomic-by-count in bigint, format as full-precision string;
+  // meter() re-parses this losslessly via parseUsdPrice → parseDecimal.
+  tokens: (s) => "$" + formatDecimal(
+    multiplyByCount(PRICE_PER_TOKEN_ATOMIC, s.count),
+    USDC_DECIMALS,
+  ),
 });
 
 // Optional real OpenAI client — loaded once at startup if OPENAI_API_KEY is set.
@@ -178,7 +190,7 @@ app.post("/stream", async (req: Request, res: Response) => {
           authorization: {
             from: "0x0000000000000000000000000000000000000000" as `0x${string}`,
             to: SELLER as `0x${string}`,
-            value: (count * Math.round(PRICE_PER_TOKEN * 1e6)).toString(),
+            value: multiplyByCount(PRICE_PER_TOKEN_ATOMIC, count).toString(),
             validAfter: "0",
             validBefore: "9999999999",
             nonce: ("0x" + id.replace(/-/g, "").padEnd(64, "0")) as `0x${string}`,
@@ -253,7 +265,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 <body>
 <header>
   <h1>pay2play · C3 · per-token streaming <span class="pill">Arc Testnet</span></h1>
-  <div class="sub">$${PRICE_PER_TOKEN.toFixed(5)} USDC per token · 1 voucher per ${TOKENS_PER_VOUCHER} tokens · batch every ${VOUCHERS_PER_BATCH} vouchers or ${MAX_FLUSH_MS / 1000}s · mode: <b id="mode" style="color:#22d3ee">…</b></div>
+  <div class="sub">$${PRICE_PER_TOKEN_DISPLAY} USDC per token · 1 voucher per ${TOKENS_PER_VOUCHER} tokens · batch every ${VOUCHERS_PER_BATCH} vouchers or ${MAX_FLUSH_MS / 1000}s · mode: <b id="mode" style="color:#22d3ee">…</b></div>
 </header>
 <main>
   <section class="panel">
@@ -286,11 +298,27 @@ const totEl  = document.getElementById('total');
 const txsEl  = document.getElementById('txs');
 const modeEl = document.getElementById('mode');
 
+// Server-baked atomic constants — bigint math in the browser too, no floats.
+const PER_VOUCHER_ATOMIC = ${(PRICE_PER_TOKEN_ATOMIC * BigInt(TOKENS_PER_VOUCHER)).toString()}n;
+const USDC_DECIMALS = ${USDC_DECIMALS};
+
+function formatAtomic(atomic) {
+  // Mirror of @pay2play/core formatDecimal — bigint → "$0.001" style string.
+  const neg = atomic < 0n;
+  const abs = neg ? -atomic : atomic;
+  const divisor = 10n ** BigInt(USDC_DECIMALS);
+  const whole = (abs / divisor).toString();
+  const frac = (abs % divisor).toString().padStart(USDC_DECIMALS, "0").replace(/0+$/, "");
+  const body = frac === "" ? whole : whole + "." + frac;
+  return (neg ? "-" : "") + body;
+}
+
 function updateStats(s) {
   sigEl.textContent = s.vouchersSigned;
   flEl.textContent  = s.vouchersFlushed;
   bEl.textContent   = s.batchesSettled;
-  totEl.textContent = '$' + (s.vouchersSigned * ${TOKENS_PER_VOUCHER} * ${PRICE_PER_TOKEN}).toFixed(6);
+  const totalAtomic = BigInt(s.vouchersSigned) * PER_VOUCHER_ATOMIC;
+  totEl.textContent = '$' + formatAtomic(totalAtomic);
   if (s.mode) modeEl.textContent = s.mode;
   if (s.lastTxs && s.lastTxs.length) {
     txsEl.innerHTML = s.lastTxs.map(tx =>

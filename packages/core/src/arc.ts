@@ -223,22 +223,25 @@ export async function verifyChainId(
   return actual;
 }
 
+import { parseDecimal, formatDecimal, USDC_DECIMALS } from "./decimal.js";
+
 /** Format a USDC amount (atomic 6-decimal) to human-readable dollars. */
 export function formatUsdc(atomic: bigint | number | string): string {
   const n = typeof atomic === "bigint" ? atomic : BigInt(atomic);
-  const whole = n / 1_000_000n;
-  const frac = n % 1_000_000n;
-  const fracStr = frac.toString().padStart(6, "0").replace(/0+$/, "");
-  return fracStr ? `${whole}.${fracStr}` : whole.toString();
+  return formatDecimal(n, USDC_DECIMALS);
 }
 
-/** Parse a "$0.001" price string to atomic 6-decimal USDC. */
+/**
+ * Parse a "$0.001" price string to atomic 6-decimal USDC.
+ *
+ * Backed by the bigint `parseDecimal` engine — no float arithmetic. Rejects
+ * inputs with more than 6 fractional digits to prevent silent precision loss.
+ * Rejects negative values — meter prices cannot be negative.
+ */
 export function parseUsdPrice(price: string): bigint {
-  const cleaned = price.replace("$", "").trim();
-  const n = parseFloat(cleaned);
-  if (!Number.isFinite(n) || n < 0) {
-    throw new Error(`Invalid price: ${price}`);
+  const atomic = parseDecimal(price, USDC_DECIMALS);
+  if (atomic < 0n) {
+    throw new Error(`parseUsdPrice: negative prices not allowed (got "${price}")`);
   }
-  // Multiply via string to avoid float precision loss at 6 decimals
-  return BigInt(Math.round(n * 1_000_000));
+  return atomic;
 }

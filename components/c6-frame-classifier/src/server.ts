@@ -3,7 +3,15 @@
  * Price scales with frames.length (from request body).
  */
 import express, { type Request } from "express";
-import { meter, ARC_TESTNET, type UsageSignal } from "@pay2play/core";
+import {
+  meter,
+  ARC_TESTNET,
+  parseDecimal,
+  formatDecimal,
+  multiplyByCount,
+  USDC_DECIMALS,
+  type UsageSignal,
+} from "@pay2play/core";
 import { createPaidMiddleware, defaultFacilitator } from "@pay2play/server/http";
 import { corsForX402 } from "@pay2play/server/middleware";
 
@@ -14,9 +22,14 @@ if (!SELLER_ADDRESS) {
   process.exit(1);
 }
 
-const PRICE_PER_FRAME = 0.0005;
+const PRICE_PER_FRAME_USD = process.env.PAY2PLAY_FRAME_PRICE_USD ?? "0.0005";
+const PRICE_PER_FRAME_ATOMIC = parseDecimal(PRICE_PER_FRAME_USD, USDC_DECIMALS); // 500n atomic
+const PRICE_PER_FRAME_DISPLAY = formatDecimal(PRICE_PER_FRAME_ATOMIC, USDC_DECIMALS);
 const m = meter({
-  frames: (s) => `$${(s.count * PRICE_PER_FRAME).toFixed(6)}`,
+  frames: (s) => "$" + formatDecimal(
+    multiplyByCount(PRICE_PER_FRAME_ATOMIC, s.count),
+    USDC_DECIMALS,
+  ),
 });
 
 const facilitator = await defaultFacilitator();
@@ -36,7 +49,7 @@ app.get("/", (_req, res) =>
   res.json({
     component: "c6-frame-classifier",
     network: ARC_TESTNET.name,
-    pricePerFrame: `$${PRICE_PER_FRAME.toFixed(4)}`,
+    pricePerFrame: "$" + PRICE_PER_FRAME_DISPLAY,
     route: "POST /classify  body: { frames: [{id, data, model?}] }",
     explorer: ARC_TESTNET.explorerAddress(SELLER_ADDRESS),
   }),
@@ -69,10 +82,17 @@ app.post(
         confidence: 0.7 + ((h % 30) / 100),
       };
     });
-    res.json({ results, count: frames.length, pricedAt: `$${(frames.length * PRICE_PER_FRAME).toFixed(6)}` });
+    res.json({
+      results,
+      count: frames.length,
+      pricedAt: "$" + formatDecimal(
+        multiplyByCount(PRICE_PER_FRAME_ATOMIC, frames.length),
+        USDC_DECIMALS,
+      ),
+    });
   },
 );
 
 app.listen(PORT, () => {
-  console.log(`[c6] on :${PORT}  $${PRICE_PER_FRAME}/frame`);
+  console.log(`[c6] on :${PORT}  $${PRICE_PER_FRAME_DISPLAY}/frame`);
 });

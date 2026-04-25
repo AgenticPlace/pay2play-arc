@@ -2,7 +2,14 @@
  * C7 — pay-per-row data query. Price scales with `?limit=`.
  */
 import express, { type Request } from "express";
-import { meter, ARC_TESTNET } from "@pay2play/core";
+import {
+  meter,
+  ARC_TESTNET,
+  parseDecimal,
+  formatDecimal,
+  multiplyByCount,
+  USDC_DECIMALS,
+} from "@pay2play/core";
 import { createPaidMiddleware, defaultFacilitator } from "@pay2play/server/http";
 import { corsForX402 } from "@pay2play/server/middleware";
 
@@ -22,9 +29,14 @@ const DATASET = Array.from({ length: 5000 }, (_, i) => ({
   ts: new Date(Date.now() - i * 1000).toISOString(),
 }));
 
-const PRICE_PER_ROW = 0.0001;
+const PRICE_PER_ROW_USD = process.env.PAY2PLAY_ROW_PRICE_USD ?? "0.0001";
+const PRICE_PER_ROW_ATOMIC = parseDecimal(PRICE_PER_ROW_USD, USDC_DECIMALS); // 100n atomic
+const PRICE_PER_ROW_DISPLAY = formatDecimal(PRICE_PER_ROW_ATOMIC, USDC_DECIMALS);
 const m = meter({
-  rows: (s) => `$${(s.count * PRICE_PER_ROW).toFixed(6)}`,
+  rows: (s) => "$" + formatDecimal(
+    multiplyByCount(PRICE_PER_ROW_ATOMIC, s.count),
+    USDC_DECIMALS,
+  ),
 });
 
 const facilitator = await defaultFacilitator();
@@ -44,7 +56,7 @@ app.get("/", (_req, res) =>
   res.json({
     component: "c7-row-meter",
     network: ARC_TESTNET.name,
-    pricePerRow: `$${PRICE_PER_ROW.toFixed(4)}`,
+    pricePerRow: "$" + PRICE_PER_ROW_DISPLAY,
     totalRows: DATASET.length,
     example: "GET /data?limit=50  (→ 402 for $0.005)",
     explorer: ARC_TESTNET.explorerAddress(SELLER_ADDRESS),
@@ -74,5 +86,5 @@ app.get(
 );
 
 app.listen(PORT, () => {
-  console.log(`[c7] on :${PORT}  $${PRICE_PER_ROW}/row`);
+  console.log(`[c7] on :${PORT}  $${PRICE_PER_ROW_DISPLAY}/row`);
 });

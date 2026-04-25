@@ -7,7 +7,14 @@
  * check a buyer's signed authorization).
  */
 import express from "express";
-import { meter, ARC_TESTNET } from "@pay2play/core";
+import {
+  meter,
+  ARC_TESTNET,
+  parseDecimal,
+  formatDecimal,
+  multiplyByCount,
+  USDC_DECIMALS,
+} from "@pay2play/core";
 import { createPaidMiddleware, defaultFacilitator } from "@pay2play/server/http";
 import { corsForX402 } from "@pay2play/server/middleware";
 
@@ -19,9 +26,16 @@ if (!SELLER_ADDRESS) {
   process.exit(1);
 }
 
+// 1 atomic USDC per 10 bytes. parseDecimal at 6-dec USDC = 1 atomic unit.
+const PRICE_PER_BYTE_ATOMIC = parseDecimal("0.000001", USDC_DECIMALS); // 1n atomic
 const m = meter({
   request: "$0.001",
-  bytes: (s) => `$${(s.count * 1e-7).toFixed(8)}`,
+  // Bigint-correct: byte count × atomic price; the overall rate is $1e-7/byte
+  // expressed as an integer division (10 bytes per atomic unit).
+  bytes: (s) => "$" + formatDecimal(
+    multiplyByCount(PRICE_PER_BYTE_ATOMIC, Math.ceil(s.count / 10)),
+    USDC_DECIMALS,
+  ),
 });
 
 const app = express();
