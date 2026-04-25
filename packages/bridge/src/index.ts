@@ -18,3 +18,6 @@ export type {
 export * from "./provider.js";
 export { BridgeRegistry, DEFAULT_PRIORITY } from "./registry.js";
 export { CctpBridgeProvider } from "./providers/cctp.js";
+export { WormholeBridgeProvider } from "./providers/wormhole.js";
+export { AxelarBridgeProvider } from "./providers/axelar.js";
+export { XcmBridgeProvider } from "./providers/xcm.js";

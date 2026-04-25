@@ -33,6 +33,18 @@
     "./cctp": {
       "types": "./dist/providers/cctp.d.ts",
       "import": "./dist/providers/cctp.js"
+    },
+    "./wormhole": {
+      "types": "./dist/providers/wormhole.d.ts",
+      "import": "./dist/providers/wormhole.js"
+    },
+    "./axelar": {
+      "types": "./dist/providers/axelar.d.ts",
+      "import": "./dist/providers/axelar.js"
+    },
+    "./xcm": {
+      "types": "./dist/providers/xcm.d.ts",
+      "import": "./dist/providers/xcm.js"
     }
   },
   "scripts": {

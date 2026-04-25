@@ -118,14 +118,13 @@ export class CctpBridgeProvider implements BridgeProvider {
   }
 
   async bridge(req: BridgeRequest, signer: BridgeSigner): Promise<BridgeResult> {
-    requireEvmSigner(signer, this.id);
     const route = findSupportedRoute(this, req.route);
-
     // AppKit needs human-readable amount strings; convert atomic → decimal.
     // USDC is 6-decimal; pad and trim trailing zeros.
     const amountStr = atomicToDecimalString(req.amountAtomic, 6);
 
     try {
+      requireEvmSigner(signer, this.id);
       const kit = await this.getKit(signer.privateKey ?? throwNoKey(this.id));
       const raw = await kit.bridge({
         sourceChain:      appKitChainName(route.from),

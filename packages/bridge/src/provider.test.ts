@@ -14,6 +14,9 @@ import {
 } from "./provider.js";
 import { BridgeRegistry, DEFAULT_PRIORITY } from "./registry.js";
 import { CctpBridgeProvider } from "./providers/cctp.js";
+import { WormholeBridgeProvider } from "./providers/wormhole.js";
+import { AxelarBridgeProvider } from "./providers/axelar.js";
+import { XcmBridgeProvider } from "./providers/xcm.js";
 
 /* ─── Synthetic provider for registry tests ───────────────────── */
 
@@ -226,5 +229,166 @@ describe("DEFAULT_PRIORITY", () => {
     ];
     const sorted = [...stubs].sort(DEFAULT_PRIORITY);
     expect(sorted.map((p) => p.id)).toEqual(["cctp", "wormhole", "axelar", "xcm"]);
+  });
+});
+
+describe("WormholeBridgeProvider", () => {
+  const provider = new WormholeBridgeProvider();
+
+  it("declares Moonbeam ↔ Ethereum routes for both USDC + USDC.wh", () => {
+    expect(provider.id).toBe("wormhole");
+    const moonbeamArc = provider.supportedRoutes.find(
+      (r) => r.from === "eip155:1284" && r.to === "eip155:1" && r.asset === "USDC.wh",
+    );
+    expect(moonbeamArc).toBeDefined();
+  });
+
+  it("estimate produces bigint-correct fees", async () => {
+    const quote = await provider.estimate({
+      route: { from: "eip155:1284", to: "eip155:1", asset: "USDC" },
+      amountAtomic: 100_000_000n,           // $100
+      recipient: "0xabc",
+    });
+    // 100 USDC - 0.02 relayer fee = 99.98 net = 99_980_000n atomic
+    expect(quote.fees.totalAtomic).toBe(20_000n);
+    expect(quote.netReceiveAtomic).toBe(99_980_000n);
+    expect(quote.providerId).toBe("wormhole");
+  });
+
+  it("rejects routes outside the Wormhole mesh", async () => {
+    await expect(
+      provider.estimate({
+        route: { from: "polkadot:asset-hub", to: "polkadot:moonbeam", asset: "xcUSDC" },
+        amountAtomic: 1_000_000n,
+        recipient: "5G...",
+      }),
+    ).rejects.toThrow(/route not supported/);
+  });
+});
+
+describe("AxelarBridgeProvider", () => {
+  const provider = new AxelarBridgeProvider();
+
+  it("declares the Axelar EVM mesh including non-CCTP chains (Linea, Filecoin, Celo)", () => {
+    expect(provider.id).toBe("axelar");
+    expect(
+      provider.supportedRoutes.some(
+        (r) => r.from === "eip155:1284" && r.to === "eip155:59144" && r.asset === "USDC",
+      ),
+    ).toBe(true);
+  });
+
+  it("estimate sums relayer + dest gas", async () => {
+    const quote = await provider.estimate({
+      route: { from: "eip155:1284", to: "eip155:8453", asset: "USDC" },
+      amountAtomic: 1_000_000n,                // $1.00
+      recipient: "0xabc",
+    });
+    // 0.05 relayer + 0.02 dest gas = 0.07 = 70_000n
+    expect(quote.fees.totalAtomic).toBe(70_000n);
+    expect(quote.fees.relayerAtomic).toBe(50_000n);
+    expect(quote.fees.destGasAtomic).toBe(20_000n);
+    expect(quote.netReceiveAtomic).toBe(930_000n);
+    expect(quote.estimatedSeconds).toBe(180);
+  });
+});
+
+describe("XcmBridgeProvider", () => {
+  const provider = new XcmBridgeProvider();
+
+  it("declares Polkadot Asset Hub corridors", () => {
+    expect(provider.id).toBe("xcm");
+    const ahMoonbeam = provider.supportedRoutes.find(
+      (r) =>
+        r.from === "polkadot:asset-hub" &&
+        r.to === "polkadot:moonbeam" &&
+        r.asset === "xcUSDC",
+    );
+    expect(ahMoonbeam).toBeDefined();
+  });
+
+  it("estimate computes the weight-fee deduction", async () => {
+    const quote = await provider.estimate({
+      route: { from: "polkadot:asset-hub", to: "polkadot:moonbeam", asset: "xcUSDC" },
+      amountAtomic: 10_000_000n,
+      recipient: "5G...",
+    });
+    expect(quote.fees.totalAtomic).toBe(50_000n);
+    expect(quote.netReceiveAtomic).toBe(9_950_000n);
+    expect(quote.estimatedSeconds).toBe(30);
+  });
+
+  it("requires a Substrate signer (rejects EVM)", async () => {
+    const result = await provider.bridge(
+      {
+        route: { from: "polkadot:asset-hub", to: "polkadot:moonbeam", asset: "xcUSDC" },
+        amountAtomic: 10_000_000n,
+        recipient: "5G...",
+      },
+      { kind: "evm", privateKey: "0xabc" },
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Substrate/);
+  });
+
+  it("rejects Wormhole-only routes (EVM↔EVM)", async () => {
+    await expect(
+      provider.estimate({
+        route: { from: "eip155:1", to: "eip155:1284", asset: "USDC" },
+        amountAtomic: 1_000_000n,
+        recipient: "0xabc",
+      }),
+    ).rejects.toThrow(/route not supported/);
+  });
+});
+
+describe("Full registry composition (all 4 providers)", () => {
+  const registry = new BridgeRegistry([
+    new CctpBridgeProvider(),
+    new WormholeBridgeProvider(),
+    new AxelarBridgeProvider(),
+    new XcmBridgeProvider(),
+  ]);
+
+  it("Arc → Base USDC: CCTP picked first (highest priority match)", () => {
+    const p = registry.pickProvider({
+      from: "eip155:5042002", to: "eip155:8453", asset: "USDC",
+    });
+    expect(p.id).toBe("cctp");
+  });
+
+  it("Moonbeam → Ethereum USDC: Wormhole + Axelar match (no CCTP — Moonbeam not in CCTP)", () => {
+    const matches = registry.forRoute({
+      from: "eip155:1284", to: "eip155:1", asset: "USDC",
+    });
+    expect(matches.map((p) => p.id)).toEqual(["wormhole", "axelar"]);
+  });
+
+  it("Moonbeam → Linea USDC: Axelar only (Wormhole has Moonbeam but not Linea)", () => {
+    const matches = registry.forRoute({
+      from: "eip155:1284", to: "eip155:59144", asset: "USDC",
+    });
+    expect(matches.map((p) => p.id)).toEqual(["axelar"]);
+  });
+
+  it("Asset Hub → Moonbeam xcUSDC: XCM only", () => {
+    const matches = registry.forRoute({
+      from: "polkadot:asset-hub", to: "polkadot:moonbeam", asset: "xcUSDC",
+    });
+    expect(matches.map((p) => p.id)).toEqual(["xcm"]);
+  });
+
+  it("compareAll returns one quote per matching provider with consistent shape", async () => {
+    const route: BridgeRoute = { from: "eip155:1284", to: "eip155:1", asset: "USDC" };
+    const quotes = await registry.compareAll({
+      route,
+      amountAtomic: 100_000_000n,
+      recipient: "0xabc",
+    });
+    expect(quotes).toHaveLength(2);
+    // Wormhole has the lower fee at this size.
+    const wh = quotes.find((q) => q.providerId === "wormhole")!;
+    const ax = quotes.find((q) => q.providerId === "axelar")!;
+    expect(wh.netReceiveAtomic).toBeGreaterThan(ax.netReceiveAtomic);
   });
 });
