@@ -32,21 +32,24 @@ git clone --depth 1 https://github.com/circlefin/evm-cctp-contracts.git     # CC
 
 ## Vyper (fully implemented — contracts + Python layer)
 
-These were implemented directly in `contracts/arc/` and `python/` rather than cloned:
+These live directly in `contracts/arc/` and `python/` rather than cloned at runtime:
 
-```bash
-# git clone https://github.com/circlefin/Circle-titanoboa-sdk.git  → python/pay2play_arc/ (GatewayClient, x402 helpers)
-# git clone https://github.com/circlefin/Vyper-agentic-payments.git → contracts/arc/ (PaymentChannel.vy, AgentEscrow.vy)
-# git clone https://github.com/circlefin/ERC-8004-vyper.git         → contracts/arc/ (SpendingLimiter.vy, SubscriptionManager.vy)
-```
+| Artifact | Lineage |
+|---|---|
+| `contracts/arc/PaymentChannel.vy` | pay2play; EIP-712 off-chain USDC channel (close/timeout) |
+| `contracts/arc/AgentEscrow.vy` | pay2play; ERC-8183 job lifecycle (OPEN→FUNDED→SUBMITTED→COMPLETED) |
+| `contracts/arc/SpendingLimiter.vy` | pay2play; per-agent daily/per-tx/total USDC caps + recipient allowlist |
+| `contracts/arc/SubscriptionManager.vy` | pay2play; recurring USDC subscriptions with pro-rata refunds |
+| `contracts/arc/PaymentSplitter.vy` | **vendored** from [vyperlang/vyper-agentic-payments](https://github.com/vyperlang/vyper-agentic-payments) — multi-recipient revenue distribution by basis-point shares |
+| `contracts/arc/Vault.vy` | **vendored** from [vyperlang/vyper-agentic-payments](https://github.com/vyperlang/vyper-agentic-payments) — per-depositor USDC vault (depositor-only withdraw) |
+| `python/pay2play_arc/` | GatewayClient, ContractLoader (Titanoboa, supports all 6 contracts), x402 helpers, FastAPI middleware |
+| `python/tests/` | Titanoboa pytest suite (skip-guarded without titanoboa installed) |
+| `contracts/arc/tests/` | Per-contract Titanoboa tests (skip-guarded) |
 
-Implemented artifacts:
-- `contracts/arc/PaymentChannel.vy` — EIP-712 off-chain USDC channel (close/timeout)
-- `contracts/arc/AgentEscrow.vy` — ERC-8183 job lifecycle (OPEN→FUNDED→SUBMITTED→COMPLETED)
-- `contracts/arc/SpendingLimiter.vy` — per-agent daily/per-tx/total USDC caps
-- `contracts/arc/SubscriptionManager.vy` — recurring USDC subscriptions with pro-rata refunds
-- `python/pay2play_arc/` — GatewayClient, ContractLoader (Titanoboa), x402 helpers, FastAPI middleware
-- `python/tests/` — Titanoboa pytest suite (skip-guarded without titanoboa installed)
+**Drift policy for vendored Vyper:** files carry a `CONTRACT_SOURCE` header
+pinning the upstream commit. CI runs `bash scripts/check-contract-drift.sh`
+to catch silent edits. Re-pin against newer upstream commits via the same
+script with `--pin <commit-sha>`.
 
 ## Critical paths inside cloned repos
 

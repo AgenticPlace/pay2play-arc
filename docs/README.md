@@ -11,12 +11,13 @@ Hackathon: **Agentic Economy on Arc** — https://lablab.ai/ai-hackathons/nano-p
 | [03-circle-nanopayments.md](./03-circle-nanopayments.md) | Gateway + Nanopayments docs, App Kit bridge, thirdweb facilitator, Python SDK |
 | [04-x402-protocol.md](./04-x402-protocol.md) | v2 spec, headers, payload shapes, all 3 facilitators, Python x402 helpers |
 | [05-repos-to-clone.md](./05-repos-to-clone.md) | Canonical git-clone list; Vyper repos now implemented in contracts/ + python/ |
-| [06-architecture.md](./06-architecture.md) | 5-package + 10-component + Vyper + Python architecture + data flows |
-| [07-components.md](./07-components.md) | Per-component spec (C1–C10) — what, why, how, accept, cut-priority |
+| [06-architecture.md](./06-architecture.md) | 5-layer ladder (L0 Blockchain → L4 App) + mindX / AgenticPlace fit + sister-repo pointer |
+| [07-components.md](./07-components.md) | Per-component spec C1–C9 + governance-layer Vyper primitives (PaymentChannel, AgentEscrow, SpendingLimiter, SubscriptionManager, PaymentSplitter, Vault) |
 | [08-margin-analysis.md](./08-margin-analysis.md) | Real-number cost comparison Arc vs Base/OP/Ethereum |
 | [09-competitive-intel.md](./09-competitive-intel.md) | Prior hackathon (Jan 2026) winners + untouched niches |
 | [10-circle-feedback.md](./10-circle-feedback.md) | Live-updated Circle Product Feedback draft — fill during build |
 | [11-tool-map.md](./11-tool-map.md) | Comprehensive tool/SDK/contract reference map covering all layers |
+| [fees.md](./fees.md) | Precision-correct fee math (bigint, 0–18 decimals lossless) + default fees + PPMT projections + how to change fees |
 
 ## Quick-reference card
 
@@ -64,3 +65,8 @@ Hackathon: **Agentic Economy on Arc** — https://lablab.ai/ai-hackathons/nano-p
 | `pnpm tsx scripts/test-c6.ts` | Test C6 frame-classifier: 402 gate + paid classify |
 | `pnpm tsx scripts/test-c7.ts` | Test C7 row-meter: 402 gate + paid row queries |
 | `pnpm tsx scripts/test-c9.ts` | Test C9 agent-identity: 402 gate + paid register + job (dry-run) |
+| `pnpm tsx scripts/test-agenticplace.ts` | Test C9 AgenticPlace gateway: 6 checks (free reads + 402 gating + on-chain health) |
+| `pnpm tsx scripts/ppmt-calculator.ts [--sweep]` | Print fee breakdown + PPMT projection (single config or all 8 axes) |
+| `bash scripts/check-contract-drift.sh` | Verify vendored Vyper contracts match pinned upstream commit |
+| `pytest contracts/arc/tests/` | Titanoboa unit tests for the 6 Vyper contracts (skip-guarded if `boa` missing) |
+| `pytest python/tests/test_p2p_contract_integration.py` | End-to-end SDK + boa-VM contract integration (skip-guarded) |

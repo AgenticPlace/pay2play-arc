@@ -28,7 +28,7 @@ What we **add**:
 | **Actor modes** | human↔agent · agent↔agent · agent↔API · machine↔machine |
 | **Cross-chain** | USDC bridge (CCTP V2) · EURC swap (FxEscrow) · same-chain send |
 | **Agent identity** | ERC-8004 register + reputation · ERC-8183 job escrow lifecycle |
-| **Smart contracts** | Vyper (PaymentChannel, AgentEscrow, SpendingLimiter, SubscriptionManager) |
+| **Smart contracts** | Vyper — pay2play-grown (PaymentChannel, AgentEscrow, SpendingLimiter, SubscriptionManager) + vendored from [vyperlang/vyper-agentic-payments](https://github.com/vyperlang/vyper-agentic-payments) (PaymentSplitter, Vault) |
 | **Languages** | TypeScript (primary) · Python (GatewayClient + Titanoboa + FastAPI) |
 
 ## Components
@@ -139,18 +139,22 @@ pnpm tsx scripts/test-c9.ts
 
 ## Research index
 
-11 docs in [`./docs/`](./docs/):
+In [`./docs/`](./docs/):
 - [`01-hackathon-rules.md`](./docs/01-hackathon-rules.md) — rules, prizes, judging
 - [`02-arc-network.md`](./docs/02-arc-network.md) — Arc testnet config (chain 5042002) + all 15 contracts
 - [`03-circle-nanopayments.md`](./docs/03-circle-nanopayments.md) — Gateway SDK, App Kit bridge, thirdweb, Python SDK
 - [`04-x402-protocol.md`](./docs/04-x402-protocol.md) — v2 spec + header format + 3 facilitators + Python
-- [`05-repos-to-clone.md`](./docs/05-repos-to-clone.md) — reference repos; Vyper repos now implemented
-- [`06-architecture.md`](./docs/06-architecture.md) — 5-package + 10-component + Vyper + Python layers
-- [`07-components.md`](./docs/07-components.md) — C1–C9 Arc components + build order
+- [`05-repos-to-clone.md`](./docs/05-repos-to-clone.md) — reference repos
+- [`06-architecture.md`](./docs/06-architecture.md) — **5-layer ladder** (L0–L4) + how mindX & AgenticPlace fit
+- [`07-components.md`](./docs/07-components.md) — C1–C9 Arc components + governance-layer Vyper primitives
 - [`08-margin-analysis.md`](./docs/08-margin-analysis.md) — chain economics
 - [`09-competitive-intel.md`](./docs/09-competitive-intel.md) — prior-winners analysis
 - [`10-circle-feedback.md`](./docs/10-circle-feedback.md) — Circle Product Feedback draft
 - [`11-tool-map.md`](./docs/11-tool-map.md) — comprehensive tool/SDK/contract reference map
+- [`fees.md`](./docs/fees.md) — **precision-correct fee math**, default fees per component, **PPMT** projections, three layers of fee setting (env / admin / on-chain)
+
+### Sister repos
+- [pay2play-algo](https://github.com/AgenticPlace/pay2play-algo) — Algorand counterpart (vendored agnostic core, AVM atomic-group settlement)
 
 ## Hackathon metadata
 
