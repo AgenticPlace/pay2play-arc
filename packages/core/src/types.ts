@@ -29,23 +29,73 @@ export interface PaymentRequired {
   accepts: PaymentRequirement[];
 }
 
-/** The client's signed authorization — base64-encoded in `payment-signature` request header. */
-export interface PaymentPayload {
+/* ─── PaymentPayload — CAIP-2 tagged union ──────────────────────────────────
+ *
+ * The `network` field discriminates EVM-style EIP-3009 authorizations from
+ * non-EVM (e.g. Algorand atomic-group proofs). Existing pay2play-arc
+ * consumers can keep using `EvmPaymentPayload` directly — no behavior
+ * change. New chains plug in by adding their own variant + type guard.
+ *
+ * The discriminant defaults to EVM (network omitted ⇒ EVM) so
+ * pre-existing serialized payloads round-trip unchanged.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** EVM EIP-3009 transferWithAuthorization payload. */
+export interface EvmPaymentAuth {
+  signature: `0x${string}`;
+  authorization: {
+    from: `0x${string}`;
+    to: `0x${string}`;
+    value: string;
+    validAfter: string;
+    validBefore: string;
+    nonce: `0x${string}`;
+  };
+}
+
+/** Algorand atomic-group proof — references an already-submitted PayTxn. */
+export interface AlgoPaymentAuth {
+  /** Sender address (58-char base32). */
+  sender: string;
+  /** Submitted Algorand transaction ID for the payment leg. */
+  txId: string;
+  /** Optional PaymentMeter ApplicationCall app ID. */
+  appId?: number;
+  /** Optional atomic group ID this txn belongs to. */
+  groupId?: string;
+}
+
+interface PaymentPayloadCommon {
   x402Version: 2;
   resource?: PaymentRequired["resource"];
   accepted?: Record<string, unknown>;
-  payload: {
-    signature: `0x${string}`;
-    authorization: {
-      from: `0x${string}`;
-      to: `0x${string}`;
-      value: string;
-      validAfter: string;
-      validBefore: string;
-      nonce: `0x${string}`;
-    };
-  };
   extensions?: Record<string, unknown>;
+}
+
+export interface EvmPaymentPayload extends PaymentPayloadCommon {
+  /** CAIP-2; omitted defaults to EVM. */
+  network?: `eip155:${string}`;
+  payload: EvmPaymentAuth;
+}
+
+export interface AlgoPaymentPayload extends PaymentPayloadCommon {
+  /** CAIP-2; required for non-EVM disambiguation. */
+  network: `algorand:${string}`;
+  payload: AlgoPaymentAuth;
+}
+
+/** The client's signed authorization — base64-encoded in `payment-signature` request header. */
+export type PaymentPayload = EvmPaymentPayload | AlgoPaymentPayload;
+
+/** Narrow a PaymentPayload to the EVM variant. */
+export function isEvmPayment(p: PaymentPayload): p is EvmPaymentPayload {
+  // Treat omitted network as EVM (back-compat with v0.1 payloads).
+  return !p.network || p.network.startsWith("eip155:");
+}
+
+/** Narrow a PaymentPayload to the Algorand variant. */
+export function isAlgoPayment(p: PaymentPayload): p is AlgoPaymentPayload {
+  return p.network?.startsWith("algorand:") === true;
 }
 
 /** The settlement receipt — base64-encoded in `PAYMENT-RESPONSE` response header. */
