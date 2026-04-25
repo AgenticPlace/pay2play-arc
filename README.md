@@ -44,7 +44,7 @@ What we **add**:
 | C7 | `row-meter` | bonus — data | $0.0001/row | **live + tested ✓** |
 | C8 | `bridge` | bonus — Stablecoin FX / Cross-chain | $0.001/op | **live + tested ✓** |
 | C9 | `agent-identity` | bonus — Agentic Economy (ERC-8004/8183) | $0.002/call | **live + tested ✓** |
-| C10 | `algo` | bonus — Algorand AVM | 1000 µALGO/call | **typecheck ✓ / needs ALGO** |
+| — | `pay2play-algo` | Algorand counterpart — separate repo | 1000 µALGO/call | [github.com/AgenticPlace/pay2play-algo](https://github.com/AgenticPlace/pay2play-algo) |
 
 Full specs: [`docs/07-components.md`](./docs/07-components.md)
 
@@ -89,7 +89,7 @@ pnpm --filter c7-row-meter start        # :4027  paid data rows
 # New components:
 pnpm --filter c8-bridge start           # :3008  cross-chain bridge (CCTP V2)
 pnpm --filter c9-agent-identity start   # :3009  ERC-8004 register + ERC-8183 jobs
-pnpm --filter c10-algo start            # :3010  Algorand AVM per-call metering
+# Algorand: see https://github.com/AgenticPlace/pay2play-algo (separate repo)
 
 # Agent identity flows:
 pnpm tsx scripts/register-agent.ts --dry-run
@@ -133,7 +133,7 @@ pnpm tsx scripts/test-c9.ts
     ┌─────────▼──────────────────────────┐
     │  Arc Testnet · Algorand Testnet    │
     │  USDC-gas + Gateway + CCTP V2      │
-    │  ERC-8004/8183 · AVM (C10)         │
+    │  ERC-8004/8183 (Arc, this repo)    │
     └────────────────────────────────────┘
 ```
 
@@ -146,7 +146,7 @@ pnpm tsx scripts/test-c9.ts
 - [`04-x402-protocol.md`](./docs/04-x402-protocol.md) — v2 spec + header format + 3 facilitators + Python
 - [`05-repos-to-clone.md`](./docs/05-repos-to-clone.md) — reference repos; Vyper repos now implemented
 - [`06-architecture.md`](./docs/06-architecture.md) — 5-package + 10-component + Vyper + Python layers
-- [`07-components.md`](./docs/07-components.md) — C1–C10 specs + build order
+- [`07-components.md`](./docs/07-components.md) — C1–C9 Arc components + build order
 - [`08-margin-analysis.md`](./docs/08-margin-analysis.md) — chain economics
 - [`09-competitive-intel.md`](./docs/09-competitive-intel.md) — prior-winners analysis
 - [`10-circle-feedback.md`](./docs/10-circle-feedback.md) — Circle Product Feedback draft

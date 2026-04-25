@@ -112,13 +112,17 @@ Each component has: purpose, dependencies, track, effort, acceptance criteria, s
 
 ---
 
-## C10 · pay2play-algo (`components/c10-algo/`) — Algorand
+## Algorand counterpart — separate repo
 
-- **Purpose**: Algorand AVM counterpart — per-call ALGO metering at 1000 microALGO ($0.001), same HTTP API surface as C1.
-- **Built on**: `PaymentMeter.algo.ts` (AlgoKit TypeScript contract) + `algosdk` + vibekit-mcp tools.
-- **Contrast**: Arc uses USDC/EVM/EIP-3009; Algorand uses ALGO/AVM/atomic-group-proof — same `X-Algo-Payment` header pattern.
-- **Effort**: 1h. **Status**: typecheck ✓ — needs `ALGO_MNEMONIC` + testnet ALGO to deploy and run live.
-- **Accept**: `app_deploy` via vibekit-mcp; `/data` endpoint returns 402 without header, 200 with confirmed tx id.
+The Algorand version of pay2play lives in its own standalone repository:
+**[github.com/AgenticPlace/pay2play-algo](https://github.com/AgenticPlace/pay2play-algo)**.
+
+- Vendors the agnostic core (`UsageSignal`, `Session`, `PaymentPayload` tagged
+  union) from this repo at a pinned commit; settles via Algorand atomic-group
+  transactions instead of Circle Gateway.
+- Same x402-shaped HTTP surface; same `meter()` / `Session` ergonomics.
+- Per-chain repos isolate codebases when chain semantics diverge —
+  `pay2play-eth` reserved for the same pattern when needed.
 
 ---
 
@@ -132,8 +136,7 @@ Each component has: purpose, dependencies, track, effort, acceptance criteria, s
 6. **C6 frames** (1h) ✓ live + tested
 7. **C8 bridge** (45m) ✓ live + tested
 8. **C9 agent-identity** (1h) ✓ live + tested (dry-run)
-9. **C10 algo** (1h) ✓ typecheck / needs ALGO
-10. **C4 dwell-reader** (completed) ✓ live
+9. **C4 dwell-reader** (completed) ✓ live
 
 ## Cut order (when phase checkpoints miss)
 
