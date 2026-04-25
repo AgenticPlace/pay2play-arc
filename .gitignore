@@ -16,6 +16,13 @@ wallets.json
 # Reference repos (cloned, not shipped)
 _refs/
 
+# Local tool / agent harness configs (per-developer, not shipped)
+.claude/
+.agents/
+.windsurf/
+scratch/
+skills-lock.json
+
 # OS/editor
 .DS_Store
 *.swp

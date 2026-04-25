@@ -137,6 +137,18 @@ Design UI to show two counters: "Vouchers signed" (instant, client) vs "On-chain
 |---|---|---|
 | Coinbase public | https://x402.org/facilitator | Base/Polygon/Arbitrum/World/Solana |
 | Circle Gateway (Arc) | embedded in `@circle-fin/x402-batching` | Arc testnet (via `settle-x402payment` API) |
+| thirdweb | https://portal.thirdweb.com/x402/facilitator | 170+ EVM chains (`thirdweb/x402`) |
+
+`@pay2play/server` exports `circleGatewayFacilitator()`, `thirdwebFacilitator()`, `coinbaseFacilitator()` — pass whichever to `createPaidMiddleware(price, { facilitator })`.
+
+## Python x402
+
+`python/pay2play_arc/x402.py` implements the protocol in Python:
+- `decode_challenge(response)` — parses `PAYMENT-REQUIRED` header
+- `encode_payload(challenge, authorization)` — builds `payment-signature` header value
+- `sign_eip3009(from_, to, value, valid_after, valid_before, nonce, private_key)` — signs EIP-3009 via `eth-account`
+
+Useful for Python agents that need to pay x402-gated APIs without the TypeScript stack.
 
 ## Ecosystem / third-party integrations
 - **xpay.sh** — hosted x402-monetized MCP proxy; useful reference for MCP+402.

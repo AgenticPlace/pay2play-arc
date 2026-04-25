@@ -94,3 +94,61 @@ export function encodeHeader(obj: unknown): string {
 export function decodeHeader<T = unknown>(b64: string): T {
   return JSON.parse(Buffer.from(b64, "base64").toString("utf-8")) as T;
 }
+
+// ── ERC-8004 Agent Identity ───────────────────────────────────────────────────
+
+/** On-chain ERC-8004 agent identity record. */
+export interface AgentIdentity {
+  agentId: bigint;
+  owner: `0x${string}`;
+  metadataURI: string;
+  reputationScore?: number;
+  registrationTx?: `0x${string}`;
+}
+
+// ── ERC-8183 Job Escrow ───────────────────────────────────────────────────────
+
+/** State machine for an ERC-8183 job. Numeric values match on-chain enum. */
+export type JobState = "OPEN" | "FUNDED" | "SUBMITTED" | "COMPLETED" | "DISPUTED";
+
+export const JOB_STATE_MAP: Record<number, JobState> = {
+  0: "OPEN",
+  1: "FUNDED",
+  2: "SUBMITTED",
+  3: "COMPLETED",
+  4: "DISPUTED",
+};
+
+export interface JobInfo {
+  jobId: bigint;
+  client: `0x${string}`;
+  provider: `0x${string}`;
+  evaluator: `0x${string}`;
+  amount: bigint;
+  expiry: bigint;
+  state: JobState;
+  deliverableHash?: `0x${string}`;
+  createTx?: `0x${string}`;
+  completeTx?: `0x${string}`;
+}
+
+// ── Bridge types ──────────────────────────────────────────────────────────────
+
+export interface BridgeEstimate {
+  fee: string;
+  feeUsdc: string;
+  estimatedTime: string;
+  sourceChain: string;
+  destinationChain: string;
+  amount: string;
+}
+
+export interface BridgeResult {
+  success: boolean;
+  txHash?: string;
+  explorerUrl?: string;
+  sourceChain: string;
+  destinationChain: string;
+  amount: string;
+  error?: string;
+}

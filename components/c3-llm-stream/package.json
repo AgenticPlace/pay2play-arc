@@ -13,7 +13,8 @@
     "@pay2play/server": "workspace:*",
     "@pay2play/client": "workspace:*",
     "@circle-fin/x402-batching": "^2.0.4",
-    "express": "^4.21.0"
+    "express": "^4.21.0",
+    "openai": "^4.98.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

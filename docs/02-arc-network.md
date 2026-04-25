@@ -56,6 +56,8 @@ Arc is **Circle's** Layer-1 EVM blockchain with USDC as native gas. Testnet-only
 | ERC-8004 IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
 | ERC-8004 ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
 | ERC-8004 ValidationRegistry | `0x8004Cb1BF31DAf7788923b405b754f57acEB4272` |
+| ERC-8183 JobEscrow | `0x0747EEf0706327138c69792bF28Cd525089e4583` |
+| Memo | `0x9702466268ccF55eAB64cdf484d272Ac08d3b75b` |
 
 ## Gotchas / red flags
 - **USDC is native gas.** No ETH paths anywhere. Faucet USDC suffices.

@@ -107,3 +107,89 @@ Design UX to **honestly distinguish** signed vouchers (instant, client-side) fro
 - The reference uses `agent.mts` with experimental TS transform (`--experimental-transform-types`) — overkill for us, plain `tsx` suffices.
 - Supabase in the reference is just for a seller dashboard showing payment history — not required for the x402 payment flow itself. We skip it.
 - The agent uses LangChain; for pay2play we offer simpler wrappers that work with any fetch/stream/MCP client.
+- **`GatewayClient.pay(url, opts)`** is the correct high-level API — handles the full 402 challenge/retry cycle internally. The lower-level `signPayment` / `sign` methods are not exported publicly. Always use `.pay()`.
+- **Top-level await in scripts**: root `package.json` has no `"type": "module"`, so `tsx` defaults to CJS. Wrap scripts in `async function main()` instead of using top-level await.
+- **`@circle-fin/app-kit` `estimateBridge`** takes adapter objects (`from: WalletContext`, `to: { adapter, chain }`), not chain-name strings. The `GET /estimate` endpoint in C8 uses a static CCTP V2 fee formula instead.
+
+---
+
+## App Kit — Bridge / Swap / Send (CCTP V2)
+
+App Kit wraps Circle's CCTP V2 for cross-chain USDC transfer, on-chain EURC swaps via FxEscrow, and same-chain sends.
+
+- Docs root: https://docs.arc.network/app-kit
+- Send same-chain: https://docs.arc.network/app-kit/quickstarts/send-tokens-same-chain
+- Bridge cross-chain: CCTP Domain 26 on Arc
+- NPM: `@circle-fin/app-kit` + `@circle-fin/adapter-viem-v2`
+
+### `@pay2play/bridge` wraps App Kit
+
+```ts
+import { BridgeModule, SwapModule, SendModule } from "@pay2play/bridge";
+
+const bridge = new BridgeModule(privateKey);
+const est = await bridge.estimate({ sourceChain: "ethereum", destinationChain: "arc", amount: "1.00" });
+const res = await bridge.bridge({ sourceChain: "ethereum", destinationChain: "arc", amount: "1.00" });
+
+const swap = new SwapModule(privateKey);
+const swapRes = await swap.swap({ fromAsset: "USDC", toAsset: "EURC", amount: "1.00" });
+
+const send = new SendModule(privateKey);
+const sendRes = await send.sendUsdc({ to: "0x...", amount: "0.50" });
+```
+
+Demo: C8 at port 3008 — `GET /estimate` (free), `POST /bridge`, `POST /swap` (each $0.001).
+
+---
+
+## thirdweb Facilitator
+
+thirdweb offers an alternative x402 facilitator supporting 170+ EVM chains — useful as fallback when Circle Gateway isn't available.
+
+- Docs: https://portal.thirdweb.com/x402/facilitator
+- NPM: `thirdweb` (sub-path `thirdweb/x402`)
+
+```ts
+import { thirdwebFacilitator } from "@pay2play/server";
+
+const facilitator = await thirdwebFacilitator({
+  secretKey:           process.env.THIRDWEB_SECRET_KEY,
+  serverWalletAddress: process.env.SERVER_WALLET_ADDRESS,
+});
+app.use(createPaidMiddleware(price, { facilitator }));
+```
+
+Comparison:
+
+| Facilitator | Chain support | Settlement | Free tier |
+|---|---|---|---|
+| Circle Gateway | Arc (Domain 26) | batched offchain | Yes |
+| Coinbase public | Base/Polygon/Arbitrum/World/Solana | onchain | 1,000 tx/mo |
+| thirdweb | 170+ EVM chains | onchain | project-based |
+
+---
+
+## Python / Circle Titanoboa SDK
+
+The `python/pay2play_arc/` package provides a Python API surface matching the TypeScript packages.
+
+- **GatewayClient** — async HTTP client that handles x402 handshake with manual EIP-3009 signing via `eth-account`
+- **ContractLoader** — wraps `boa.load()` (Titanoboa) to instantiate Vyper contracts in-process for testing
+- **x402 helpers** — `decode_challenge()`, `encode_payload()`, `sign_eip3009()`
+- **FastAPI middleware** — `create_gateway_middleware()` injects payment verification into route handlers
+
+```python
+from pay2play_arc import GatewayClient, create_gateway_middleware
+
+# Client: pay per request
+client = GatewayClient(chain="arcTestnet", private_key="0x...")
+result = await client.pay("https://api.example.com/premium")
+
+# Server: FastAPI guard
+from fastapi import FastAPI
+app = FastAPI()
+middleware = create_gateway_middleware(price_usdc="0.001", pay_to="0x...")
+app.middleware("http")(middleware)
+```
+
+Install: `pip install -e "python/[dev]"` (requires Python 3.11+, optional Titanoboa for Vyper contract tests).

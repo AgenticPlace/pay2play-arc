@@ -30,13 +30,23 @@ git clone --depth 1 https://github.com/circlefin/stablecoin-evm.git         # US
 git clone --depth 1 https://github.com/circlefin/evm-cctp-contracts.git     # CCTP contracts
 ```
 
-## Vyper bonus (skip unless specifically pursuing Vyper originality points)
+## Vyper (fully implemented — contracts + Python layer)
+
+These were implemented directly in `contracts/arc/` and `python/` rather than cloned:
 
 ```bash
-# git clone https://github.com/circlefin/Circle-titanoboa-sdk.git
-# git clone https://github.com/circlefin/Vyper-agentic-payments.git
-# git clone https://github.com/circlefin/ERC-8004-vyper.git
+# git clone https://github.com/circlefin/Circle-titanoboa-sdk.git  → python/pay2play_arc/ (GatewayClient, x402 helpers)
+# git clone https://github.com/circlefin/Vyper-agentic-payments.git → contracts/arc/ (PaymentChannel.vy, AgentEscrow.vy)
+# git clone https://github.com/circlefin/ERC-8004-vyper.git         → contracts/arc/ (SpendingLimiter.vy, SubscriptionManager.vy)
 ```
+
+Implemented artifacts:
+- `contracts/arc/PaymentChannel.vy` — EIP-712 off-chain USDC channel (close/timeout)
+- `contracts/arc/AgentEscrow.vy` — ERC-8183 job lifecycle (OPEN→FUNDED→SUBMITTED→COMPLETED)
+- `contracts/arc/SpendingLimiter.vy` — per-agent daily/per-tx/total USDC caps
+- `contracts/arc/SubscriptionManager.vy` — recurring USDC subscriptions with pro-rata refunds
+- `python/pay2play_arc/` — GatewayClient, ContractLoader (Titanoboa), x402 helpers, FastAPI middleware
+- `python/tests/` — Titanoboa pytest suite (skip-guarded without titanoboa installed)
 
 ## Critical paths inside cloned repos
 

@@ -2,52 +2,81 @@
 
 ## Layers
 
-1. **core** (`@pay2play/core`) — `UsageSignal`, `Meter`, `Session`, Arc config, x402 types.
-2. **server** (`@pay2play/server`) — Express/Hono HTTP + MCP (streamable-HTTP) + SSE adapters.
+1. **core** (`@pay2play/core`) — `UsageSignal`, `Meter`, `Session`, Arc config (15 contracts + ABIs), x402 types, `AgentIdentity`/`JobState` types.
+2. **server** (`@pay2play/server`) — Express/Hono HTTP + MCP (streamable-HTTP) + SSE adapters + pluggable facilitators (Circle/thirdweb/Coinbase).
 3. **client** (`@pay2play/client`) — fetch wrapper + OpenAI streaming wrapper + MCP client + browser viewport hook.
-4. **observe** (`@pay2play/observe`) — Arc WS subscription + batched-tx counter for the demo dashboard.
-5. **components** (`components/c1..c7/`) — one per hackathon angle.
+4. **bridge** (`@pay2play/bridge`) — BridgeModule + SwapModule + SendModule wrapping `@circle-fin/app-kit` (CCTP V2).
+5. **observe** (`@pay2play/observe`) — Arc WS subscription + batched-tx counter for the demo dashboard.
+6. **components** (`components/c1..c10/`) — one per hackathon angle.
+7. **Vyper contracts** (`contracts/arc/`) — PaymentChannel, AgentEscrow, SpendingLimiter, SubscriptionManager.
+8. **Python SDK** (`python/pay2play_arc/`) — GatewayClient, ContractLoader (Titanoboa), x402 helpers, FastAPI middleware.
 
 ## Diagram
 
 ```
-┌───────────────── @pay2play/core ──────────────────┐
-│  meter()       — UsageSignal → $USDC              │
-│  session()     — voucher accumulator for streams  │
-│  arc           — chain config + eth_chainId check │
-│  types         — x402 v2 shapes                   │
-└──────────────────┬───────────────┬────────────────┘
-                   │               │
-      ┌────────────▼─────┐ ┌───────▼──────────┐
-      │ @pay2play/server │ │ @pay2play/client │
-      │  .http (express) │ │  .fetch          │
-      │  .sse  (stream)  │ │  .openai (stream)│
-      │  .mcp  (paidTool)│ │  .mcp (withPay)  │
-      │  .hono (optional)│ │  .viewport (dom) │
-      └─────────┬────────┘ └────────┬─────────┘
-                │                   │
-       ┌────────▼───────────────────▼──────┐
-       │  components/                      │
-       │  c1 api-meter        ← Track 1    │
-       │  c2 agent-loop       ← Track 2    │
-       │  c3 llm-stream   🌟  ← Track 3    │
-       │  c4 dwell-reader     ← Track 4    │
-       │  c5 mcp-tool         bonus        │
-       │  c6 frame-classifier bonus M2M    │
-       │  c7 row-meter        bonus data   │
-       └────────────────┬──────────────────┘
+┌───────────────── @pay2play/core ──────────────────────────┐
+│  meter()       — UsageSignal → $USDC                      │
+│  session()     — voucher accumulator for streams          │
+│  arc           — chain config + 15 Arc contracts + ABIs   │
+│  types         — x402 v2 shapes + AgentIdentity/JobState  │
+└──────────────────┬────────────────┬────────────────────────┘
+                   │                │
+      ┌────────────▼─────┐  ┌───────▼──────────┐  ┌──────────────────┐
+      │ @pay2play/server │  │ @pay2play/client │  │ @pay2play/bridge │
+      │  .http (express) │  │  .fetch          │  │  BridgeModule    │
+      │  .sse  (stream)  │  │  .openai (stream)│  │  SwapModule      │
+      │  .mcp  (paidTool)│  │  .mcp (withPay)  │  │  SendModule      │
+      │  .facilitators   │  │  .viewport (dom) │  │  (@circle-fin/   │
+      │   circle/thirdweb│  └────────┬─────────┘  │   app-kit)       │
+      │   /coinbase      │           │             └────────┬─────────┘
+      └─────────┬────────┘           │                      │
+                │                   │                       │
+       ┌────────▼───────────────────▼───────────────────────▼──┐
+       │  components/                                           │
+       │  c1 api-meter        ← Track 1 (HTTP 402)             │
+       │  c2 agent-loop       ← Track 2 (agent-to-agent)       │
+       │  c3 llm-stream   ★   ← Track 3 (per-token SSE)        │
+       │  c4 dwell-reader     ← Track 4 (viewport dwell)       │
+       │  c5 mcp-tool         bonus (MCP paid tool)            │
+       │  c6 frame-classifier bonus (M2M per-frame)            │
+       │  c7 row-meter        bonus (per-row data)             │
+       │  c8 bridge           bonus (CCTP V2 bridge/swap)      │
+       │  c9 agent-identity   bonus (ERC-8004 + ERC-8183)      │
+       │  c10 algo            bonus (Algorand AVM microALGO)   │
+       └────────────────┬───────────────────────────────────────┘
+                        │                     │
+           ┌────────────▼──────┐  ┌───────────▼──────────────┐
+           │  Arc Testnet L1   │  │  Algorand Testnet (AVM)  │
+           │  USDC-gas         │  │  ALGO + PaymentMeter.ts  │
+           │  Gateway batch    │  │  vibekit-mcp tools       │
+           │  CCTP Domain 26   │  └──────────────────────────┘
+           └───────────────────┘
                         │
-                        ▼
-                 Arc Testnet L1
-         (USDC-gas + Gateway + Nanopayments)
+       ┌────────────────▼────────────────────┐
+       │  Vyper contracts (contracts/arc/)    │
+       │  PaymentChannel.vy  — EIP-712 chan   │
+       │  AgentEscrow.vy     — ERC-8183       │
+       │  SpendingLimiter.vy — agent caps     │
+       │  SubscriptionManager.vy — recurring  │
+       └─────────────────────────────────────┘
+                        │
+       ┌────────────────▼────────────────────┐
+       │  Python SDK (python/pay2play_arc/)   │
+       │  GatewayClient — async x402 HTTP     │
+       │  ContractLoader — boa.load() Vyper   │
+       │  middleware — FastAPI/Flask           │
+       └─────────────────────────────────────┘
 ```
 
 ## Dependency graph
 
 ```
-core ──► server ──► components/c1, c2, c5, c6, c7
+core ──► server ──► components/c1, c2, c5, c6, c7, c9
 core ──► client ──► components/c3 (stream), c4 (viewport)
+core ──► bridge ──► components/c8 (bridge/swap)
 core ──► observe ─► site/ (live counter)
+                    components/c10 (algosdk, vibekit-mcp — independent)
+                    python/pay2play_arc/ (independent Python layer)
 ```
 
 ## Data flow — single paid HTTP call
