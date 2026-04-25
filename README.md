@@ -95,6 +95,9 @@ pnpm --filter c10-algo start            # :3010  Algorand AVM per-call metering
 pnpm tsx scripts/register-agent.ts --dry-run
 pnpm tsx scripts/create-job.ts --dry-run
 
+# AgenticPlace gateway smoke test (start C9 first):
+pnpm tsx scripts/test-agenticplace.ts        # 6 checks vs http://localhost:3009
+
 # Gateway setup (run once per buyer wallet):
 pnpm tsx scripts/gateway-deposit.ts 1   # deposit 1 USDC into Circle Gateway
 pnpm tsx scripts/gateway-balance.ts     # check gateway + wallet balances

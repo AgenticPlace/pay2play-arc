@@ -1,25 +1,30 @@
 /**
- * C9 · Agent Identity + Job Escrow Server
+ * C9 — Agent Identity + Job Escrow Server (AgenticPlace gateway, Arc Testnet)
  *
- * Exposes ERC-8004 agent registration and ERC-8183 job lifecycle via REST.
- * Each endpoint is gated by a $0.002 nanopayment via Circle Gateway.
+ * Mounts the chain-agnostic AgenticPlace router from @pay2play/server with Arc-
+ * specific implementations of:
+ *   - registerAgent  (ERC-8004 IdentityRegistry + ReputationRegistry)
+ *   - runJobLifecycle / getJobInfo  (ERC-8183 JobEscrow)
  *
- * Demonstrates the full "Agentic Economy" use case:
- *   - AI agent registers on-chain identity (ERC-8004)
- *   - Client creates and funds a job (ERC-8183)
- *   - Provider submits work; evaluator settles USDC payment
+ * Each paid action gates through Circle Gateway batched USDC at $0.002 / call.
+ * Startup health check verifies the three Arc-deployed contracts are reachable.
  */
 
 import express from "express";
-import { keccak256, toHex } from "viem";
-import { meter, ARC_TESTNET } from "@pay2play/core";
-import { createPaidMiddleware, defaultFacilitator } from "@pay2play/server/http";
-import { corsForX402, asyncHandler } from "@pay2play/server/middleware";
+import { createPublicClient, http } from "viem";
+import { meter, ARC_TESTNET, IDENTITY_REGISTRY_ABI, JOB_ESCROW_ABI } from "@pay2play/core";
+import { defaultFacilitator } from "@pay2play/server/http";
+import { corsForX402 } from "@pay2play/server/middleware";
+import {
+  createAgenticPlaceRouter,
+  runHealthChecks,
+  type ContractHealthCheck,
+} from "@pay2play/server/agenticplace";
 import { registerAgent } from "./register.js";
 import { runJobLifecycle, getJobInfo } from "./job.js";
 
-const PORT    = Number(process.env.PORT ?? 3009);
-const PAY_TO  = process.env.SELLER_ADDRESS ?? ARC_TESTNET.contracts.gatewayWallet;
+const PORT = Number(process.env.PORT ?? 3009);
+const PAY_TO = process.env.SELLER_ADDRESS ?? ARC_TESTNET.contracts.gatewayWallet;
 if (!process.env.SELLER_ADDRESS) {
   console.warn("[c9] SELLER_ADDRESS not set — using gatewayWallet fallback for PAY_TO");
 }
@@ -29,11 +34,59 @@ const app = express();
 app.use(corsForX402());
 app.use(express.json());
 
-// Health
+/* -- Health check probes ------------------------------------------------- */
+
+const arcChain = {
+  id: ARC_TESTNET.chainId,
+  name: ARC_TESTNET.name,
+  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 6 },
+  rpcUrls: { default: { http: [ARC_TESTNET.rpcUrl] } },
+} as const;
+const publicClient = createPublicClient({ chain: arcChain, transport: http(ARC_TESTNET.rpcUrl) });
+
+const contractChecks: ContractHealthCheck[] = [
+  {
+    name: "IdentityRegistry",
+    address: ARC_TESTNET.contracts.identityRegistry,
+    probe: async () => {
+      const code = await publicClient.getCode({
+        address: ARC_TESTNET.contracts.identityRegistry as `0x${string}`,
+      });
+      return Boolean(code && code.length > 2);
+    },
+  },
+  {
+    name: "ReputationRegistry",
+    address: ARC_TESTNET.contracts.reputationRegistry,
+    probe: async () => {
+      const code = await publicClient.getCode({
+        address: ARC_TESTNET.contracts.reputationRegistry as `0x${string}`,
+      });
+      return Boolean(code && code.length > 2);
+    },
+  },
+  {
+    name: "JobEscrow",
+    address: ARC_TESTNET.contracts.jobEscrow,
+    probe: async () => {
+      const code = await publicClient.getCode({
+        address: ARC_TESTNET.contracts.jobEscrow as `0x${string}`,
+      });
+      return Boolean(code && code.length > 2);
+    },
+  },
+];
+
+// Touch ABI imports so the build doesn't strip them (used by callers via core).
+void IDENTITY_REGISTRY_ABI;
+void JOB_ESCROW_ABI;
+
+/* -- Health endpoint at root and via router ------------------------------ */
+
 app.get("/", (_req, res) => {
   res.json({
     service: "c9-agent-identity",
-    description: "ERC-8004 agent registration + ERC-8183 job lifecycle",
+    description: "AgenticPlace gateway — ERC-8004 identity + ERC-8183 job escrow on Arc",
     arc: {
       chainId: ARC_TESTNET.chainId,
       identityRegistry:   ARC_TESTNET.contracts.identityRegistry,
@@ -41,153 +94,67 @@ app.get("/", (_req, res) => {
       validationRegistry: ARC_TESTNET.contracts.validationRegistry,
       jobEscrow:          ARC_TESTNET.contracts.jobEscrow,
     },
+    pricing: { perOperation: "$0.002 USDC" },
     endpoints: [
-      "POST /agent/register  { ownerKey, metadataURI, initialScore? }",
-      "POST /job/create      { clientKey, providerKey, descText, budgetUsdc }",
-      "GET  /job/:id         — read job state",
+      "GET  /info               — service metadata (free)",
+      "GET  /health             — contract reachability (free)",
+      "POST /agent/register     — ERC-8004 mint + reputation seed ($0.002)",
+      "POST /job/create         — ERC-8183 full lifecycle ($0.002)",
+      "GET  /job/:id            — read job state (free)",
     ],
   });
 });
 
+/* -- Mount the AgenticPlace router --------------------------------------- */
+
 async function startServer() {
   const facilitator = await defaultFacilitator();
-  const paidFactory = createPaidMiddleware({
-    meter: m,
-    payTo: PAY_TO,
-    facilitator,
-    onSettled: (info) => console.log("[c9] settled", info),
-  });
-  const paid = paidFactory({ description: "Agentic identity/escrow op ($0.002)" });
 
-  // ERC-8004: Register agent identity
-  app.post("/agent/register", paid, asyncHandler(async (req, res) => {
-    const { ownerKey, metadataURI, initialScore, dryRun } = req.body as {
-      ownerKey:    `0x${string}`;
-      metadataURI: string;
-      initialScore?: number;
-      dryRun?: boolean;
-    };
-
-    if (!ownerKey || !metadataURI) {
-      res.status(400).json({ error: "ownerKey and metadataURI required" });
-      return;
-    }
-
-    const result = await registerAgent({
-      ownerKey,
-      metadataURI,
-      initialScore,
-      dryRun: dryRun ?? false,
-    });
-
-    res.json({
-      result: { ...result, agentId: result.agentId?.toString() },
-      registries: {
-        identity:   ARC_TESTNET.contracts.identityRegistry,
-        reputation: ARC_TESTNET.contracts.reputationRegistry,
-        validation: ARC_TESTNET.contracts.validationRegistry,
+  const router = createAgenticPlaceRouter({
+    paidMiddleware: {
+      meter: m,
+      payTo: PAY_TO,
+      facilitator,
+      onSettled: (info) => console.log("[c9] settled", info),
+    },
+    description: "AgenticPlace identity/escrow op ($0.002)",
+    registerAgent,
+    runJobLifecycle,
+    getJobInfo,
+    info: () => ({
+      service: "c9-agent-identity",
+      chain: ARC_TESTNET.name,
+      chainId: ARC_TESTNET.chainId,
+      contracts: {
+        identityRegistry:   ARC_TESTNET.contracts.identityRegistry,
+        reputationRegistry: ARC_TESTNET.contracts.reputationRegistry,
+        jobEscrow:          ARC_TESTNET.contracts.jobEscrow,
       },
-    });
-  }));
-
-  // ERC-8183: Create + fund + submit + complete a job
-  app.post("/job/create", paid, async (req, res) => {
-    const { clientKey, providerKey, evaluatorKey, descText, budgetUsdc, deliverable, dryRun } = req.body as {
-      clientKey:    `0x${string}`;
-      providerKey:  `0x${string}`;
-      evaluatorKey?: `0x${string}`;
-      descText:     string;
-      budgetUsdc:   number;
-      deliverable?: string;
-      dryRun?:      boolean;
-    };
-
-    if (!clientKey || !providerKey || !descText || !budgetUsdc) {
-      res.status(400).json({ error: "clientKey, providerKey, descText, budgetUsdc required" });
-      return;
-    }
-
-    if (dryRun) {
-      const { privateKeyToAccount } = await import("viem/accounts");
-      const client   = privateKeyToAccount(clientKey);
-      const provider = privateKeyToAccount(providerKey);
-      const expiry   = Math.floor(Date.now() / 1000) + 3600;
-      const descHash = keccak256(toHex(descText));
-      console.log(`[ERC-8183] DRY RUN — would createJob with:
-  client:   ${client.address}
-  provider: ${provider.address}
-  budgetUsdc: ${budgetUsdc}
-  expiry:   ${expiry}
-  descHash: ${descHash}
-  JobEscrow: ${ARC_TESTNET.contracts.jobEscrow}`);
-      res.json({
-        dryRun: true,
-        wouldCall: {
-          contract: ARC_TESTNET.contracts.jobEscrow,
-          function: "createJob",
-          args: { provider: provider.address, evaluator: client.address, expiry, descHash },
-          usdcBudget: budgetUsdc,
-        },
-      });
-      return;
-    }
-
-    let result;
-    try {
-      result = await runJobLifecycle({
-        clientKey,
-        providerKey,
-        evaluatorKey: evaluatorKey ?? clientKey,
-        descText,
-        budgetUsdc,
-        deliverable: deliverable ?? "work delivered",
-      });
-    } catch (err) {
-      res.status(500).json({ error: String(err) });
-      return;
-    }
-
-    res.json({
-      result: {
-        jobId:      result.jobId.toString(),
-        createTx:   result.createTx,
-        fundTx:     result.fundTx,
-        submitTx:   result.submitTx,
-        completeTx: result.completeTx,
-        finalState: result.finalState,
-      },
-      jobEscrow: ARC_TESTNET.contracts.jobEscrow,
-      explorer:  ARC_TESTNET.explorerTx(result.completeTx),
-    });
+    }),
+    healthCheck: () => runHealthChecks(contractChecks),
   });
 
-  // Read job state (free)
-  app.get("/job/:id", asyncHandler(async (req, res) => {
-    const idParam = req.params.id;
-    if (!idParam || !/^\d+$/.test(idParam)) {
-      res.status(400).json({ error: "job id must be a non-negative integer" });
-      return;
-    }
-    const jobId = BigInt(idParam);
-    const info = await getJobInfo(jobId);
-    res.json({
-      job: {
-        ...info,
-        jobId:  info.jobId.toString(),
-        amount: info.amount.toString(),
-        expiry: info.expiry.toString(),
-      },
-      explorer: ARC_TESTNET.explorerAddress(ARC_TESTNET.contracts.jobEscrow),
-    });
-  }));
+  app.use(router);
+
+  // Run health check at startup — log loudly if any contract is missing
+  const startupHealth = await runHealthChecks(contractChecks);
+  if (!startupHealth.ok) {
+    console.error("[c9] STARTUP HEALTH CHECK FAILED:", JSON.stringify(startupHealth.checks, null, 2));
+    console.error("[c9] One or more Arc contracts are unreachable. Continuing — /health endpoint will reflect this.");
+  } else {
+    console.log("[c9] startup health: all 3 Arc contracts reachable");
+  }
 
   app.listen(PORT, () => {
     console.log(`[c9-agent-identity] listening on :${PORT}`);
     console.log(`[c9] IdentityRegistry:   ${ARC_TESTNET.contracts.identityRegistry}`);
     console.log(`[c9] ReputationRegistry: ${ARC_TESTNET.contracts.reputationRegistry}`);
-    console.log(`[c9] ValidationRegistry: ${ARC_TESTNET.contracts.validationRegistry}`);
     console.log(`[c9] JobEscrow:          ${ARC_TESTNET.contracts.jobEscrow}`);
+    console.log(`[c9] try: curl http://localhost:${PORT}/health`);
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((err) => {
+  console.error("[c9] fatal startup error:", err);
+  process.exit(1);
+});

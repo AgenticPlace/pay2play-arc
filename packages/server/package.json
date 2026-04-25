@@ -25,6 +25,10 @@
     "./middleware": {
       "types": "./dist/middleware.d.ts",
       "import": "./dist/middleware.js"
+    },
+    "./agenticplace": {
+      "types": "./dist/agenticplace.d.ts",
+      "import": "./dist/agenticplace.js"
     }
   },
   "scripts": {
