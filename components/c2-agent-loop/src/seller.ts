@@ -4,6 +4,7 @@
 import express from "express";
 import { meter, ARC_TESTNET } from "@pay2play/core";
 import { createPaidMiddleware, defaultFacilitator } from "@pay2play/server/http";
+import { corsForX402 } from "@pay2play/server/middleware";
 
 const PORT = Number(process.env.C2_SELLER_PORT ?? "4022");
 const SELLER_ADDRESS = process.env.SELLER_ADDRESS;
@@ -16,6 +17,7 @@ const m = meter({ request: "$0.0005" });
 const facilitator = await defaultFacilitator();
 
 const app = express();
+app.use(corsForX402());
 app.use(express.json());
 
 const paid = createPaidMiddleware({

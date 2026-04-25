@@ -40,6 +40,8 @@ function toySearch(q: string) {
   ];
 }
 
+import { corsForX402 } from "@pay2play/server/middleware";
+
 const mcp = new McpServer({ name: "pay2play-search", version: "0.1.0" });
 
 mcp.tool(
@@ -79,6 +81,7 @@ mcp.tool(
 // Streamable-HTTP transport; exact setup may require
 // adjusting once @modelcontextprotocol/sdk+@x402/mcp versions are pinned.
 const app = express();
+app.use(corsForX402());
 app.use(express.json());
 
 app.get("/", (_req, res) =>

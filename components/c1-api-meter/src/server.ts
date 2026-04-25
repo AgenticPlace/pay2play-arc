@@ -9,8 +9,10 @@
 import express from "express";
 import { meter, ARC_TESTNET } from "@pay2play/core";
 import { createPaidMiddleware, defaultFacilitator } from "@pay2play/server/http";
+import { corsForX402 } from "@pay2play/server/middleware";
 
 const PORT = Number(process.env.C1_PORT ?? "4021");
+const MAX_SETTLEMENTS = 1000;
 const SELLER_ADDRESS = process.env.SELLER_ADDRESS;
 if (!SELLER_ADDRESS) {
   console.error("Set SELLER_ADDRESS in .env (run scripts/generate-wallets.ts first)");
@@ -23,9 +25,10 @@ const m = meter({
 });
 
 const app = express();
+app.use(corsForX402());
 app.use(express.json());
 
-// Settlement log (in-memory; real version writes CSV)
+// Settlement log (in-memory ring buffer, capped at MAX_SETTLEMENTS).
 const settlements: { endpoint: string; amount: string; payer: string; tx?: string; at: number }[] = [];
 
 const facilitator = await defaultFacilitator();
@@ -35,6 +38,7 @@ const paid = createPaidMiddleware({
   facilitator,
   onSettled: (info) => {
     settlements.push({ ...info, at: Date.now() });
+    if (settlements.length > MAX_SETTLEMENTS) settlements.shift();
     console.log(
       `[settle] ${info.endpoint}  $${info.amount}  from ${info.payer.slice(0, 10)}…  tx=${info.transaction ?? "pending"}`,
     );

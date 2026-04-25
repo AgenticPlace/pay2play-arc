@@ -5,6 +5,7 @@
 import express, { type Request } from "express";
 import { meter, ARC_TESTNET, type UsageSignal } from "@pay2play/core";
 import { createPaidMiddleware, defaultFacilitator } from "@pay2play/server/http";
+import { corsForX402 } from "@pay2play/server/middleware";
 
 const PORT = Number(process.env.C6_PORT ?? "4026");
 const SELLER_ADDRESS = process.env.SELLER_ADDRESS;
@@ -28,6 +29,7 @@ const paid = createPaidMiddleware({
 });
 
 const app = express();
+app.use(corsForX402());
 app.use(express.json({ limit: "10mb" }));
 
 app.get("/", (_req, res) =>

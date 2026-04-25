@@ -14,14 +14,19 @@ import express from "express";
 import { keccak256, toHex } from "viem";
 import { meter, ARC_TESTNET } from "@pay2play/core";
 import { createPaidMiddleware, defaultFacilitator } from "@pay2play/server/http";
+import { corsForX402, asyncHandler } from "@pay2play/server/middleware";
 import { registerAgent } from "./register.js";
 import { runJobLifecycle, getJobInfo } from "./job.js";
 
 const PORT    = Number(process.env.PORT ?? 3009);
 const PAY_TO  = process.env.SELLER_ADDRESS ?? ARC_TESTNET.contracts.gatewayWallet;
+if (!process.env.SELLER_ADDRESS) {
+  console.warn("[c9] SELLER_ADDRESS not set — using gatewayWallet fallback for PAY_TO");
+}
 
 const m = meter({ request: "$0.002" });
 const app = express();
+app.use(corsForX402());
 app.use(express.json());
 
 // Health
@@ -55,7 +60,7 @@ async function startServer() {
   const paid = paidFactory({ description: "Agentic identity/escrow op ($0.002)" });
 
   // ERC-8004: Register agent identity
-  app.post("/agent/register", paid, async (req, res) => {
+  app.post("/agent/register", paid, asyncHandler(async (req, res) => {
     const { ownerKey, metadataURI, initialScore, dryRun } = req.body as {
       ownerKey:    `0x${string}`;
       metadataURI: string;
@@ -83,7 +88,7 @@ async function startServer() {
         validation: ARC_TESTNET.contracts.validationRegistry,
       },
     });
-  });
+  }));
 
   // ERC-8183: Create + fund + submit + complete a job
   app.post("/job/create", paid, async (req, res) => {
@@ -157,9 +162,14 @@ async function startServer() {
   });
 
   // Read job state (free)
-  app.get("/job/:id", async (req, res) => {
-    const jobId = BigInt(req.params.id);
-    const info  = await getJobInfo(jobId);
+  app.get("/job/:id", asyncHandler(async (req, res) => {
+    const idParam = req.params.id;
+    if (!idParam || !/^\d+$/.test(idParam)) {
+      res.status(400).json({ error: "job id must be a non-negative integer" });
+      return;
+    }
+    const jobId = BigInt(idParam);
+    const info = await getJobInfo(jobId);
     res.json({
       job: {
         ...info,
@@ -169,7 +179,7 @@ async function startServer() {
       },
       explorer: ARC_TESTNET.explorerAddress(ARC_TESTNET.contracts.jobEscrow),
     });
-  });
+  }));
 
   app.listen(PORT, () => {
     console.log(`[c9-agent-identity] listening on :${PORT}`);

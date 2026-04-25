@@ -17,19 +17,30 @@
 import express from "express";
 import { meter, ARC_TESTNET } from "@pay2play/core";
 import { createPaidMiddleware, defaultFacilitator } from "@pay2play/server/http";
+import { corsForX402, asyncHandler } from "@pay2play/server/middleware";
 import { BridgeModule, SwapModule } from "@pay2play/bridge";
 
-const PORT       = Number(process.env.PORT       ?? 3008);
-const SELLER_KEY = (process.env.SELLER_PRIVATE_KEY ?? "0x0") as `0x${string}`;
+const PORT       = Number(process.env.PORT ?? 3008);
 const PAY_TO     = process.env.SELLER_ADDRESS ?? ARC_TESTNET.contracts.gatewayWallet;
-const BUYER_KEY  = (process.env.BUYER_PRIVATE_KEY ?? "0x0") as `0x${string}`;
+const BUYER_KEY  = process.env.BUYER_PRIVATE_KEY as `0x${string}` | undefined;
+const SELLER_KEY = process.env.SELLER_PRIVATE_KEY as `0x${string}` | undefined;
 
-const bridgeModule = new BridgeModule(BUYER_KEY);
-const swapModule   = new SwapModule(BUYER_KEY);
+if (!BUYER_KEY || !SELLER_KEY) {
+  console.warn(
+    "[c8-bridge] BUYER_PRIVATE_KEY or SELLER_PRIVATE_KEY not set — /bridge and /swap will return 503 until configured. /estimate still works.",
+  );
+}
+if (!process.env.SELLER_ADDRESS) {
+  console.warn("[c8-bridge] SELLER_ADDRESS not set — using gatewayWallet fallback for PAY_TO");
+}
+
+const bridgeModule = BUYER_KEY ? new BridgeModule(BUYER_KEY) : null;
+const swapModule   = BUYER_KEY ? new SwapModule(BUYER_KEY)   : null;
 
 const m = meter({ request: "$0.001" });
 
 const app = express();
+app.use(corsForX402());
 app.use(express.json());
 
 // Health
@@ -90,7 +101,11 @@ async function startServer() {
   });
   paid = paidFactory({ description: "Cross-chain USDC bridge op ($0.001)" });
 
-  app.post("/bridge", paid, async (req, res) => {
+  app.post("/bridge", paid, asyncHandler(async (req, res) => {
+    if (!bridgeModule) {
+      res.status(503).json({ error: "BUYER_PRIVATE_KEY not configured" });
+      return;
+    }
     const { sourceChain, destinationChain, amount, recipientAddress } = req.body as {
       sourceChain: string;
       destinationChain: string;
@@ -108,9 +123,13 @@ async function startServer() {
       result,
       arc: { chainId: ARC_TESTNET.chainId, cctpDomain: ARC_TESTNET.cctpDomain },
     });
-  });
+  }));
 
-  app.post("/swap", paid, async (req, res) => {
+  app.post("/swap", paid, asyncHandler(async (req, res) => {
+    if (!swapModule) {
+      res.status(503).json({ error: "BUYER_PRIVATE_KEY not configured" });
+      return;
+    }
     const { chain, fromToken, toToken, amount, slippageTolerance } = req.body as {
       chain: string;
       fromToken: string;
@@ -126,16 +145,13 @@ async function startServer() {
 
     const result = await swapModule.swap({ chain, fromToken, toToken, amount, slippageTolerance });
     res.json({ result });
-  });
+  }));
 
   app.listen(PORT, () => {
     console.log(`[c8-bridge] listening on :${PORT}`);
     console.log(`[c8-bridge] Arc CCTP Domain ${ARC_TESTNET.cctpDomain}`);
     console.log(`[c8-bridge] USDC ${ARC_TESTNET.contracts.usdc}`);
     console.log(`[c8-bridge] TokenMessengerV2 ${ARC_TESTNET.contracts.cctpTokenMessenger}`);
-    if (SELLER_KEY === "0x0") {
-      console.warn("[c8-bridge] SELLER_PRIVATE_KEY not set — bridge ops will fail");
-    }
   });
 }
 
