@@ -1,15 +1,57 @@
 # pay2play architecture
 
-## Layers
+## The 5-layer ladder
 
-1. **core** (`@pay2play/core`) — `UsageSignal`, `Meter`, `Session`, Arc config (15 contracts + ABIs), x402 types, `AgentIdentity`/`JobState` types.
-2. **server** (`@pay2play/server`) — Express/Hono HTTP + MCP (streamable-HTTP) + SSE adapters + pluggable facilitators (Circle/thirdweb/Coinbase).
+Top-to-bottom, every piece of pay2play sits at exactly one layer. The layer
+framing is borrowed from
+[vyperlang/vyper-agentic-payments docs](https://github.com/vyperlang/vyper-agentic-payments/blob/master/docs/architecture.md)
+and mapped onto our codebase paths:
+
+| Layer | What | In this repo |
+|---|---|---|
+| **L4 — App** | HTTP / MCP / SSE / browser components — buyers and sellers meet here | `components/c1-api-meter`, `c2-agent-loop`, `c3-llm-stream`, `c4-dwell-reader`, `c5-mcp-tool`, `c6-frame-classifier`, `c7-row-meter`, `c8-bridge`, `c9-agent-identity` |
+| **L3 — Governance** | On-chain contracts that govern long-lived state (jobs, channels, subscriptions, splits, vaults) | `contracts/arc/{PaymentChannel, AgentEscrow, SpendingLimiter, SubscriptionManager, PaymentSplitter, Vault}.vy` + ERC-8004 / ERC-8183 deployed addresses pinned in `packages/core/src/arc.ts` |
+| **L2 — Payment Protocol** | x402 — the HTTP-level payment handshake (`PAYMENT-REQUIRED` 402 ↔ signed `X-PAYMENT` retry) | `packages/core/src/types.ts` (PaymentPayload tagged union), `packages/server/src/http.ts` (`createPaidMiddleware`), `packages/core/src/fee.ts` (PriceBreakdown) |
+| **L1 — Settlement** | Circle Gateway batched USDC — gasless, batched, lossless precision via bigint atomic units | `packages/server/src/facilitators.ts`, `scripts/gateway-deposit.ts`, `packages/core/src/decimal.ts` |
+| **L0 — Blockchain** | Arc testnet (eip155:5042002) — USDC-native gas, sub-cent finality | `packages/core/src/arc.ts` ARC_TESTNET, RPC `https://rpc.testnet.arc.network`, explorer `testnet.arcscan.app` |
+
+### Where mindX and AgenticPlace fit
+
+- **mindX** (live at `mindx.pythai.net`, source `/home/hacker/mindX/`) is an
+  *orchestration layer over L4*. mindX agents invoke L4 metered tools via
+  `tools/pay2play_metered_tool.py`; settlements flow back down through L2→L1.
+  The autonomous 5-min loop is rate-limited at the wrapper so it doesn't
+  burn USDC on idle deliberation cycles.
+- **AgenticPlace** (live at `agenticplace.pythai.net`, source
+  `/home/hacker/mindX/AgenticPlace/`) is the *marketplace surface* that
+  consumes pay2play L1–L3. The mindX FastAPI backend
+  (`mindx_backend_service/agenticplace_routes.py`) proxies to the
+  pay2play C9 gateway; the React frontend (`AgenticPlace/api/p2p.ts`)
+  handles the EIP-3009 retry-after-sign for paid actions. Marketplace
+  splits will route through L3 `PaymentSplitter.vy` (provider / platform /
+  treasury basis-point shares).
+
+### Sister repo for non-EVM chains
+
+- **pay2play-algo** ([github.com/AgenticPlace/pay2play-algo](https://github.com/AgenticPlace/pay2play-algo))
+  vendors the agnostic L1+L2 core (decimal, fee, types, session) and
+  ships its own L0/L3 stack (Algorand testnet + AVM `PaymentMeter.algo.ts`).
+  The CAIP-2 tagged `PaymentPayload` (EVM | Algorand) is the discriminant
+  that lets the same L4 abstractions service either chain.
+
+## Layers (legacy 8-package view, by repo path)
+
+The 5-layer ladder above is the conceptual model. Below is the same surface
+expressed as the actual TypeScript packages and component directories on disk:
+
+1. **core** (`@pay2play/core`) — `UsageSignal`, `Meter`, `Session`, decimal+fee math, Arc config (15 contracts + ABIs), x402 types (CAIP-2 tagged PaymentPayload), `AgentIdentity`/`JobState` types.
+2. **server** (`@pay2play/server`) — Express HTTP + MCP (streamable-HTTP) + SSE adapters + pluggable facilitators (Circle/thirdweb/Coinbase) + `corsForX402` + `asyncHandler` + AgenticPlace router + fee-admin router.
 3. **client** (`@pay2play/client`) — fetch wrapper + OpenAI streaming wrapper + MCP client + browser viewport hook.
 4. **bridge** (`@pay2play/bridge`) — BridgeModule + SwapModule + SendModule wrapping `@circle-fin/app-kit` (CCTP V2).
-5. **observe** (`@pay2play/observe`) — Arc WS subscription + batched-tx counter for the demo dashboard.
-6. **components** (`components/c1..c10/`) — one per hackathon angle.
-7. **Vyper contracts** (`contracts/arc/`) — PaymentChannel, AgentEscrow, SpendingLimiter, SubscriptionManager.
-8. **Python SDK** (`python/pay2play_arc/`) — GatewayClient, ContractLoader (Titanoboa), x402 helpers, FastAPI middleware.
+5. **observe** (`@pay2play/observe`) — Arc WS subscription + batched-tx counter for the demo dashboard. _(Documented; not yet implemented.)_
+6. **components** (`components/c1..c9/`) — one per hackathon angle (C10 algo lives in the sister `pay2play-algo` repo).
+7. **Vyper contracts** (`contracts/arc/`) — PaymentChannel, AgentEscrow, SpendingLimiter, SubscriptionManager (pay2play) + PaymentSplitter, Vault (vendored from vyperlang/vyper-agentic-payments).
+8. **Python SDK** (`python/pay2play_arc/`) — GatewayClient, ContractLoader (Titanoboa, supports all 6 contracts), x402 helpers, FastAPI middleware.
 
 ## Diagram
 
